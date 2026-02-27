@@ -146,6 +146,18 @@ def add_ema(df):
 # MTF BIAS
 # ======================================================================
 
+# Bar durations in nanoseconds — higher-TF signals are only available AFTER
+# the bar closes.  Shifting timestamps forward by this amount prevents the
+# backtest from using a bar whose close price is still in the future.
+_TF_PERIOD_NS = {
+    'M1':  60_000_000_000,           #  1 min
+    'M5':  300_000_000_000,          #  5 min
+    'M15': 900_000_000_000,          # 15 min
+    'H1':  3_600_000_000_000,        #  1 hour
+    'H4':  14_400_000_000_000,       #  4 hours
+}
+
+
 def compute_mtf_bias(tfs, m5_index):
     total_w = sum(MTF_WEIGHTS.values())
     n = len(m5_index); bias = np.zeros(n, dtype=np.float64)
@@ -155,7 +167,16 @@ def compute_mtf_bias(tfs, m5_index):
         if df is None or len(df) < 22 or 'ema_9' not in df.columns: continue
         e9 = df['ema_9'].values; e21 = df['ema_21'].values; cl = df['close'].values
         sig = np.where((e9>e21)&(cl>e9), 1.0, np.where((e9<e21)&(cl<e9), -1.0, 0.0))
-        tf_data[tf_name] = (df.index.asi8, sig)
+        # FIX: shift higher-TF timestamps forward by bar period so a bar's
+        # signal is only available AFTER the bar closes.  Without this, the
+        # M15/H1/H4 signal at M5 bar 10:05 uses the close from 10:14:55 /
+        # 10:59:55 / 11:59:55 — pure look-ahead bias.
+        # M5 is the base TF (we evaluate at its close) — no shift needed.
+        # M1 completes within each M5 bar — no shift needed.
+        tt = df.index.asi8
+        if tf_name in ('M15', 'H1', 'H4'):
+            tt = tt + _TF_PERIOD_NS[tf_name]
+        tf_data[tf_name] = (tt, sig)
     m5_ns = m5_index.asi8
     for tf_name, w in MTF_WEIGHTS.items():
         if tf_name not in tf_data: continue
