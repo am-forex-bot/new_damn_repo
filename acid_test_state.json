@@ -1,0 +1,37 @@
+{
+  "EUR_JPY": {
+    "trade_id": "678",
+    "direction": 1,
+    "entry_time_utc": "2026-02-27T14:05:23.118441+00:00",
+    "entry_price": 184.234,
+    "bars_held": 94
+  },
+  "CAD_JPY": {
+    "trade_id": "680",
+    "direction": 1,
+    "entry_time_utc": "2026-02-27T14:05:23.447641+00:00",
+    "entry_price": 114.238,
+    "bars_held": 94
+  },
+  "NZD_JPY": {
+    "trade_id": "690",
+    "direction": 1,
+    "entry_time_utc": "2026-02-27T14:50:23.267305+00:00",
+    "entry_price": 93.433,
+    "bars_held": 85
+  },
+  "NZD_USD": {
+    "trade_id": "706",
+    "direction": 1,
+    "entry_time_utc": "2026-02-27T15:20:22.601321+00:00",
+    "entry_price": 0.59948,
+    "bars_held": 79
+  },
+  "EUR_USD": {
+    "trade_id": "724",
+    "direction": 1,
+    "entry_time_utc": "2026-02-27T16:05:23.026453+00:00",
+    "entry_price": 1.18158,
+    "bars_held": 70
+  }
+}
