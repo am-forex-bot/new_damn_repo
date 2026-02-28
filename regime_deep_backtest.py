@@ -89,7 +89,7 @@ GRID = {
 
 SLIPPAGE_LEVELS = [0, 0.5, 1.0, 1.5, 2.0, 3.0]
 RNG_SEED = 42
-MIN_TRADES_TRAIN = 20
+MIN_TRADES_TRAIN = 10
 
 # Nanosecond bar periods for lookahead prevention
 _TF_NS = {
@@ -667,6 +667,7 @@ def process_pair(df_5s, pair_name, pair_idx, pip_mult):
                 'dow': ts.dayofweek,
                 'window': ts.hour * 2 + (1 if ts.minute >= 30 else 0),
                 'entry_ts': str(ts),
+                'spread_pips': float(spread_arr[i]),
                 # Filter values
                 'd1_trend_20_50_match':  (m5_d1_trend_20_50[sig_bar] == d),
                 'd1_trend_50_200_match': (m5_d1_trend_50_200[sig_bar] == d),
@@ -788,6 +789,7 @@ def build_global_arrays(all_events):
         'year':        np.array([e['year'] for e in all_events], dtype=np.int32),
         'dow':         np.array([e['dow'] for e in all_events], dtype=np.int32),
         'window':      np.array([e['window'] for e in all_events], dtype=np.int32),
+        'signal_bar':  np.array([e['signal_bar'] for e in all_events], dtype=np.int64),
         # Filter booleans
         'd1_20_50':    np.array([e['d1_trend_20_50_match'] for e in all_events], dtype=np.bool_),
         'd1_50_200':   np.array([e['d1_trend_50_200_match'] for e in all_events], dtype=np.bool_),
@@ -795,11 +797,15 @@ def build_global_arrays(all_events):
         'hurst':       np.array([e['hurst_val'] for e in all_events], dtype=np.float32),
         'vov_pctile':  np.array([e['vov_pctile'] for e in all_events], dtype=np.float32),
         'rsi_div_ag':  np.array([e['rsi_div_against'] for e in all_events], dtype=np.bool_),
-        # Entry validity
+        # Entry validity and bars
         'entry_valid': np.stack([e['entry_valid'] for e in all_events]),   # (n, 2)
+        'entry_bars':  np.stack([e['entry_bars'] for e in all_events]),    # (n, 2)
+        'exit_bars':   np.stack([e['exit_bars'] for e in all_events]),     # (n, 2, 4)
         # PnL arrays
         'pnl_full':    np.stack([e['pnl_full'] for e in all_events]),      # (n, 2, 4)
         'pnl_partial': np.stack([e['pnl_partial'] for e in all_events]),   # (n, 2, 4)
+        # Spread at entry for diagnostics
+        'spread_pips': np.array([e.get('spread_pips', 0.0) for e in all_events], dtype=np.float32),
         'n_events':    n,
     }
     return g
@@ -854,9 +860,31 @@ def _combo_label(d1_i, adx_i, hur_i, vov_i, div_i, ent_i, ext_i, par_i):
     return ' | '.join(parts)
 
 
-def run_grid_sweep(g, years_list):
+def _apply_position_blocking(sorted_events, pair_idx_arr, entry_bars_arr,
+                              exit_bars_arr, n_pairs):
     """
-    Sweep all 1,152 combos. For each combo, compute per-year PnL sums and trade counts.
+    Apply per-pair position blocking: only one open trade per pair at a time.
+    sorted_events: indices into global arrays, sorted by entry bar.
+    entry/exit_bars_arr: already extracted for these events (same length).
+    Returns boolean mask of which events survive blocking.
+    """
+    n = len(sorted_events)
+    keep = np.ones(n, dtype=np.bool_)
+    last_exit = np.full(n_pairs, -1, dtype=np.int64)
+    for i in range(n):
+        ei = sorted_events[i]
+        pi = pair_idx_arr[ei]
+        eb = entry_bars_arr[i]
+        if eb <= last_exit[pi]:
+            keep[i] = False
+        else:
+            last_exit[pi] = exit_bars_arr[i]
+    return keep
+
+
+def run_grid_sweep(g, years_list, n_pairs):
+    """
+    Sweep all 1,152 combos with per-pair position blocking.
     Returns (sums, counts) of shape (N_TOTAL_COMBOS, n_years).
     """
     n_events = g['n_events']
@@ -890,30 +918,47 @@ def run_grid_sweep(g, years_list):
                         filter_masks[fi] = d1_mask & adx_mask & hur_mask & vov_mask & div_mask
                         fi += 1
 
-    # Sweep: for each combo, sum PnLs per year
+    # Sort events by signal_bar globally (needed for position blocking)
+    sort_order = np.argsort(g['signal_bar'])
+
+    # Sweep: for each combo, apply position blocking then sum PnLs per year
     sums = np.zeros((N_TOTAL_COMBOS, n_years), dtype=np.float64)
     counts = np.zeros((N_TOTAL_COMBOS, n_years), dtype=np.int32)
 
-    log.info(f"  Sweeping {N_TOTAL_COMBOS:,} combos ...")
+    log.info(f"  Sweeping {N_TOTAL_COMBOS:,} combos with position blocking ...")
     for fi in range(N_FILTER_COMBOS):
         fmask = filter_masks[fi]
         for ent_i in range(len(ENTRY_OPTS)):
             # Combine filter mask with entry validity
             emask = fmask & g['entry_valid'][:, ent_i]
-            valid_idx = np.where(emask)[0]
-            if len(valid_idx) == 0:
+            # Get valid events sorted by signal_bar
+            sorted_valid = sort_order[emask[sort_order]]
+            if len(sorted_valid) == 0:
                 continue
-            v_yr = yr_idx[valid_idx]
+
             for ext_i in range(len(EXIT_OPTS)):
+                # Position blocking: per-pair, one trade at a time
+                # Entry bar depends on entry method, exit bar on exit method
+                eb_arr = g['entry_bars'][sorted_valid, ent_i]
+                xb_arr = g['exit_bars'][sorted_valid, ent_i, ext_i]
+                keep = _apply_position_blocking(
+                    sorted_valid, g['pair_idx'], eb_arr, xb_arr, n_pairs)
+                blocked_idx = sorted_valid[keep]
+
+                if len(blocked_idx) == 0:
+                    continue
+
+                v_yr = yr_idx[blocked_idx]
+
                 for par_i in range(len(PARTIAL_OPTS)):
                     combo_flat = (fi * N_METHOD_COMBOS +
                                   ent_i * len(EXIT_OPTS) * len(PARTIAL_OPTS) +
                                   ext_i * len(PARTIAL_OPTS) +
                                   par_i)
                     if par_i == 0:
-                        pnl_arr = g['pnl_full'][valid_idx, ent_i, ext_i]
+                        pnl_arr = g['pnl_full'][blocked_idx, ent_i, ext_i]
                     else:
-                        pnl_arr = g['pnl_partial'][valid_idx, ent_i, ext_i]
+                        pnl_arr = g['pnl_partial'][blocked_idx, ent_i, ext_i]
                     # Remove NaN (invalid exits)
                     valid_pnl = ~np.isnan(pnl_arr)
                     for yi in range(n_years):
@@ -1307,7 +1352,7 @@ def main():
     log.info(f"  Years: {years_list}")
 
     # ── Grid sweep ──
-    sums, counts = run_grid_sweep(g, years_list)
+    sums, counts = run_grid_sweep(g, years_list, n_pairs=len(pairs))
 
     # ── Results ──
     top_combos = print_top_combos(sums, counts, years_list, n_top=25)
@@ -1348,6 +1393,17 @@ def main():
 
     # Per-pair
     print_per_pair_breakdown(g, sums, counts, years_list, top_combos, pair_names)
+
+    # ── Spread cost diagnostic ──
+    _hdr("SPREAD COST DIAGNOSTIC")
+    spreads = g['spread_pips']
+    print(f"  Avg spread at entry: {spreads.mean():.2f} pips")
+    print(f"  Median spread: {np.median(spreads):.2f} pips")
+    print(f"  P25/P75/P95: {np.percentile(spreads, 25):.2f} / "
+          f"{np.percentile(spreads, 75):.2f} / {np.percentile(spreads, 95):.2f}")
+    print(f"  Round-trip spread cost (entry+exit): ~{spreads.mean():.2f} pips")
+    print(f"\n  NOTE: Each trade pays ~{spreads.mean():.1f} pips in spread.")
+    print(f"  Signal must generate >{spreads.mean():.1f} pips avg to be profitable.")
 
     # ── Summary ──
     elapsed = time_mod.time() - t_start
