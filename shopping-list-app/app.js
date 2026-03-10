@@ -405,15 +405,17 @@
     // Common aliases
     const aliases = {
       "sainsbury": "Sainsbury's", "sainsburys": "Sainsbury's", "sainsbury's": "Sainsbury's",
-      "sainos": "Sainsbury's", "sains": "Sainsbury's",
-      "aldi": "Aldi", "aldis": "Aldi",
-      "lidl": "Lidl", "lidls": "Lidl",
-      "tesco": "Tesco", "tescos": "Tesco",
-      "asda": "Asda", "asdas": "Asda",
-      "morrisons": "Morrisons", "morrison": "Morrisons", "morries": "Morrisons",
-      "waitrose": "Waitrose",
-      "coop": "Co-op", "co-op": "Co-op",
-      "m&s": "M&S", "marks": "M&S",
+      "sainos": "Sainsbury's", "sains": "Sainsbury's", "sainsburies": "Sainsbury's",
+      "aldi": "Aldi", "aldis": "Aldi", "audi": "Aldi", "oldie": "Aldi", "all day": "Aldi",
+      "lidl": "Lidl", "lidls": "Lidl", "little": "Lidl", "liddell": "Lidl", "needle": "Lidl",
+      "tesco": "Tesco", "tescos": "Tesco", "tesco's": "Tesco",
+      "asda": "Asda", "asdas": "Asda", "asthma": "Asda",
+      "morrisons": "Morrisons", "morrison": "Morrisons", "morries": "Morrisons", "morrison's": "Morrisons",
+      "waitrose": "Waitrose", "wait rose": "Waitrose",
+      "coop": "Co-op", "co-op": "Co-op", "co op": "Co-op",
+      "m&s": "M&S", "marks": "M&S", "m and s": "M&S", "marks and spencer": "M&S",
+      "iceland": "Iceland",
+      "costco": "Costco",
     };
     const alias = aliases[lower];
     if (alias) {
@@ -690,13 +692,11 @@
 
     els.btnWhatsappShare.addEventListener('click', () => {
       if (!state.listId) { toast('Generate or enter a list ID first'); return; }
-      const appUrl = window.location.href;
-      const msg = `Hey! Here's our shared shopping list.\n\n` +
-        `1. Open the app: ${appUrl}\n` +
-        `2. Tap the ⚙ settings icon (top right)\n` +
-        `3. Paste this List ID: ${state.listId}\n` +
-        `4. Tap "Apply"\n\n` +
-        `We're synced! 🛒`;
+      const base = window.location.origin + window.location.pathname;
+      const appUrl = base + '?list=' + encodeURIComponent(state.listId);
+      const msg = `Hey! Here's our shared shopping list 🛒\n\n` +
+        `Tap this link and it'll set everything up automatically:\n${appUrl}\n\n` +
+        `Then add it to your home screen (Chrome menu → "Add to Home screen") so it works like an app.`;
       const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
       window.open(waUrl, '_blank');
     });
@@ -824,6 +824,17 @@
   // ---- Boot ----
   document.addEventListener('DOMContentLoaded', () => {
     loadLocalState();
+
+    // Auto-apply list ID from URL (e.g. ?list=abc123)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlListId = urlParams.get('list');
+    if (urlListId) {
+      state.listId = urlListId.trim().toLowerCase();
+      saveLocalState();
+      // Clean the URL so it doesn't re-apply on refresh
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
     renderTabs();
     renderList();
     bindEvents();
@@ -833,6 +844,7 @@
     if (window.FIREBASE_CONFIG) {
       document.addEventListener('firebase-ready', () => {
         initFirebase();
+        if (urlListId) toast('List connected! You\'re synced 🛒');
       });
     } else {
       updateSyncStatus(false);
