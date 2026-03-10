@@ -48,6 +48,7 @@
     btnGenerateId: $('#btn-generate-id'),
     btnApplyId: $('#btn-apply-id'),
     btnCopyId: $('#btn-copy-id'),
+    btnWhatsappShare: $('#btn-whatsapp-share'),
     btnClearCompleted: $('#btn-clear-completed'),
     btnSettingsClose: $('#btn-settings-close'),
     addStoreModal: $('#add-store-modal'),
@@ -685,6 +686,19 @@
         els.listIdInput.select();
         toast('Copy the ID from the field above');
       });
+    });
+
+    els.btnWhatsappShare.addEventListener('click', () => {
+      if (!state.listId) { toast('Generate or enter a list ID first'); return; }
+      const appUrl = window.location.href;
+      const msg = `Hey! Here's our shared shopping list.\n\n` +
+        `1. Open the app: ${appUrl}\n` +
+        `2. Tap the ⚙ settings icon (top right)\n` +
+        `3. Paste this List ID: ${state.listId}\n` +
+        `4. Tap "Apply"\n\n` +
+        `We're synced! 🛒`;
+      const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+      window.open(waUrl, '_blank');
     });
 
     els.btnClearCompleted.addEventListener('click', () => {

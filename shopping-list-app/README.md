@@ -1,123 +1,170 @@
-# The Shopping List
+# The Shopping List - Setup Guide
 
-A shared shopping list PWA with voice input, store tabs, and aisle memory that learns where items are in your supermarkets.
+A shared shopping list app for you and your wife. Voice input, store tabs, and it learns where items are in each supermarket.
 
-## Features
+---
 
-- **Voice input** - Tap the mic and say "tinned tomatoes - Aldi" to add items
-- **Store tabs** - Items automatically grouped by store (Aldi, Sainsbury's, etc.)
-- **Real-time sync** - Both you and your partner see the same list via Firebase
-- **Duplicate detection** - Catches duplicates even with different wording ("tinned tomatoes" vs "canned tomatoes")
-- **Aisle memory** - When you tick an item off, it asks which aisle you found it in. Next time you add that item, it shows the aisle location
-- **Smart ordering** - Items sorted by aisle so you can shop in order
-- **Split aisle support** - Large stores (like big Sainsbury's) with walkways through aisles get A/B half labels
-- **Works offline** - PWA caches everything locally, syncs when back online
+## What You Need
 
-## Quick Start (No Sync)
+- A laptop/computer (for the one-time setup)
+- Both your Android phones
+- A Google account (for Firebase - free)
 
-The app works immediately without any setup - just open `index.html` in a browser. Items are saved in your browser's local storage.
+---
 
-To serve it properly (needed for voice input and PWA install):
+## Step 1: Create a Firebase Project (on your laptop)
 
-```bash
-cd shopping-list-app
-python3 -m http.server 8000
-# Open http://localhost:8000 on your phone
-```
+This is what syncs the list between your phones. It's free.
 
-Or use any static file server (Node: `npx serve`, VS Code Live Server, etc.)
+1. Open **https://console.firebase.google.com/** in your browser
+2. Click **"Create a project"**
+3. Name it anything (e.g. "shopping-list") and click Continue
+4. Turn **off** Google Analytics (you don't need it) and click **Create project**
+5. Wait for it to finish, then click **Continue**
 
-## Setting Up Sync (Firebase)
+## Step 2: Enable the Database (on your laptop)
 
-To sync between two phones:
+1. In your Firebase project, click **Build** in the left sidebar
+2. Click **Firestore Database**
+3. Click **"Create database"**
+4. Select **"Start in test mode"** and click Next
+5. Pick the location closest to you (e.g. `europe-west2` for UK) and click **Enable**
 
-### 1. Create a Firebase Project (Free)
-1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Click "Create a project" - give it any name
-3. Disable Google Analytics (not needed) and create
+## Step 3: Get Your Firebase Config (on your laptop)
 
-### 2. Enable Firestore
-1. In your Firebase project, go to **Build > Firestore Database**
-2. Click "Create database"
-3. Choose **Start in test mode** (fine for personal use)
-4. Select a region close to you and create
+1. Click the **gear icon** (top left, next to "Project Overview") → **Project settings**
+2. Scroll down to **"Your apps"** section
+3. Click the **web icon** (`</>`)
+4. Enter any nickname (e.g. "shopping list") and click **Register app**
+5. You'll see a code block with `firebaseConfig = { ... }` - keep this page open, you need these values
 
-### 3. Get Your Config
-1. Go to **Project Settings** (gear icon) > **General**
-2. Scroll to "Your apps" > click the web icon (`</>`)
-3. Register app with any name
-4. Copy the `firebaseConfig` object
+## Step 4: Add Your Config to the App (on your laptop)
 
-### 4. Add Config to the App
-Edit `firebase-config.js` and uncomment/fill in your config:
+1. Open the file `shopping-list-app/firebase-config.js` in a text editor
+2. Replace the contents with your values from Step 3. It should look like this:
 
 ```js
 window.FIREBASE_CONFIG = {
-  apiKey: "AIzaSy...",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project",
-  storageBucket: "your-project.appspot.com",
+  apiKey: "AIzaSyB1234...",
+  authDomain: "shopping-list-abc.firebaseapp.com",
+  projectId: "shopping-list-abc",
+  storageBucket: "shopping-list-abc.appspot.com",
   messagingSenderId: "123456789",
-  appId: "1:123456789:web:abc123"
+  appId: "1:123456789:web:abc123def456"
 };
+
+(function() {
+  if (!window.FIREBASE_CONFIG) return;
+  const scripts = [
+    'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js',
+    'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js',
+  ];
+  let loaded = 0;
+  scripts.forEach(src => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = () => {
+      loaded++;
+      if (loaded === scripts.length) {
+        document.dispatchEvent(new Event('firebase-ready'));
+      }
+    };
+    document.head.appendChild(script);
+  });
+})();
 ```
 
-### 5. Deploy & Share
-The easiest way to host it for free:
+3. Save the file
+
+## Step 5: Deploy the App (on your laptop)
+
+You need Node.js installed. If you don't have it: **https://nodejs.org/** (download the LTS version).
+
+Open a terminal and run:
 
 ```bash
-# Install Firebase CLI
+# Install Firebase CLI (one-time)
 npm install -g firebase-tools
 
-# Login and init
+# Login to Firebase
 firebase login
-firebase init hosting
-# Select your project, set public directory to "." , say yes to single-page app
 
-# Deploy
+# Go to the app folder
+cd shopping-list-app
+
+# Set up hosting
+firebase init hosting
+```
+
+When it asks:
+- **Select a project** → pick the one you created in Step 1
+- **Public directory** → type `.` (just a dot)
+- **Single-page app** → type `y`
+- **Overwrite index.html** → type `N`
+
+Then deploy:
+
+```bash
 firebase deploy
 ```
 
-This gives you a URL like `https://your-project.web.app` - share it with your partner.
+It will give you a URL like `https://shopping-list-abc.web.app` — **this is your app!**
 
-### 6. Link Your Lists
-1. Open the app on your phone
-2. Tap the settings icon (top right)
-3. Tap "New" to generate a list ID
-4. Tap "Copy List ID to Share" and send it to your partner
-5. Your partner opens the app, goes to Settings, pastes the ID, and taps "Apply"
-6. You're synced!
+## Step 6: Install on Your Phone (on your Android phone)
 
-## Aisle System
+1. Open **Chrome** on your Android phone
+2. Go to the URL from Step 5 (e.g. `https://shopping-list-abc.web.app`)
+3. Chrome will show a banner saying **"Add to Home screen"** — tap it
+   - If no banner appears: tap the **three dots menu** (top right) → **"Add to Home screen"** → **"Add"**
+4. The app icon now appears on your home screen like a normal app
 
-When you tick an item as bought, the app asks where you found it:
+## Step 7: Create and Share Your List ID (on your phone)
 
-- **Aisle number** (1, 2, 3...)
-- **Side** (Left / Right as you walk in)
-- **Position** (Start / Middle / End of the aisle)
+This is how both phones see the same list:
 
-For **large stores with split aisles** (where a walkway cuts through the middle):
-- Go to Settings and toggle "Split aisles" for that store
-- The picker adds a **Front half (A) / Back half (B)** option
+1. Open the app
+2. Tap the **⚙ settings icon** (top right)
+3. Tap **"New"** to generate a list ID
+4. Tap **"Apply"** — you should see "Connected & syncing" in green
+5. Tap **"Share via WhatsApp"** — this opens WhatsApp with a message containing the list ID and instructions for your wife
 
-This creates labels like:
-- `Aisle 3 - left side - middle` (standard)
-- `Aisle 5B - right side - start` (split aisle store)
+## Step 8: Your Wife's Phone (on her Android phone)
 
-The app remembers aisle locations per item per store, so next time you add "milk" to "Aldi", it automatically shows where to find it.
+1. She opens the WhatsApp message you sent
+2. She taps the link to open the app in Chrome
+3. She adds it to her home screen (same as Step 6)
+4. She opens the app, taps **⚙ settings**
+5. She pastes the list ID from the WhatsApp message
+6. She taps **"Apply"**
+7. Done — you're both synced!
 
-## How Voice Input Works
+---
 
-The app uses the Web Speech API (built into Chrome/Safari). Say things like:
-- "milk" (adds to current tab's store)
-- "bread Aldi" (adds to Aldi)
-- "gluten free pasta Sainsbury's" (adds to Sainsbury's)
-- "tinned tomatoes Lidl" (creates Lidl tab if it doesn't exist)
+## How to Use It
 
-It recognises store names even with slight variations ("Sainsbury's", "Sainsburys", "sainos").
+### Adding Items
+- **Voice**: Tap the mic button and say something like:
+  - "tinned plum tomatoes Aldi"
+  - "GF bread Sainsbury's"
+  - "salted peanuts"  (adds to whichever store tab you're on)
+- **Type**: Type in the text box, e.g. `milk - Aldi` and tap +
 
-## Browser Support
+### Ticking Items Off
+- Tap the circle next to an item to mark it as bought
+- It will ask **"Where did you find this?"** — tap the aisle, side, and position
+- Tap **Skip** if you don't want to record the aisle
+- Next time you add that item to that store, the aisle info shows automatically
 
-- **Chrome/Edge** (Android & Desktop) - Full support including voice
-- **Safari** (iOS) - Full support including voice
-- **Firefox** - Everything except voice input (no Web Speech API)
+### Aisle System
+- **Aisle number**: The aisle number in the store
+- **Side**: Left or Right as you walk into the aisle
+- **Position**: Start (near entrance), Middle, or End (far end)
+- **Split aisles** (for big Sainsbury's): Go to Settings → toggle "Split aisles" for that store. This adds Front half (A) / Back half (B) — A is the entrance side of the walkway, B is the far side
+
+### Managing Stores
+- Say a new store name when adding an item and it auto-creates the tab
+- Or tap the **+** button next to the tabs
+- Remove stores in Settings
+
+### Clearing the List
+- After a shop, go to Settings → **"Remove all ticked items"** to clear everything you've bought

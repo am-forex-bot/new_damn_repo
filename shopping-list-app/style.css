@@ -449,6 +449,20 @@ body {
 .btn-small.btn-primary { flex: 0; }
 .full-width { width: 100%; margin-top: 8px; }
 
+.btn-whatsapp {
+  background: #25D366;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.btn-whatsapp:active { opacity: 0.85; }
+
 /* ===== Aisle Form ===== */
 .aisle-item-label {
   font-weight: 600;
