@@ -24,16 +24,15 @@ This is what syncs the list between your phones. It's free.
 
 ## Step 2: Enable the Database (on your laptop)
 
-1. In your Firebase project, click **Build** in the left sidebar
-2. Click **Firestore Database**
-3. Click **"Create database"**
-4. Select **"Start in test mode"** and click Next
-5. Pick the location closest to you (e.g. `europe-west2` for UK) and click **Enable**
+1. On the project home page, click the **"Build a backend"** card
+2. Select **Cloud Firestore** and click **Create database**
+3. Select **"Start in test mode"** and click Next
+4. Pick the location closest to you (e.g. `europe-west2` for UK) and click **Enable**
 
 ## Step 3: Get Your Firebase Config (on your laptop)
 
-1. Click the **gear icon** (top left, next to "Project Overview") → **Project settings**
-2. Scroll down to **"Your apps"** section
+1. Click the **Home** icon (top left) to go back to the project home page
+2. Click **"+ Add app"** (under the project name at the top)
 3. Click the **web icon** (`</>`)
 4. Enter any nickname (e.g. "shopping list") and click **Register app**
 5. You'll see a code block with `firebaseConfig = { ... }` - keep this page open, you need these values
