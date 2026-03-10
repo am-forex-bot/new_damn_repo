@@ -24,10 +24,16 @@ This is what syncs the list between your phones. It's free.
 
 ## Step 2: Enable the Database (on your laptop)
 
-1. On the project home page, click the **"Build a backend"** card
-2. Select **Cloud Firestore** and click **Create database**
-3. Select **"Start in test mode"** and click Next
-4. Pick the location closest to you (e.g. `europe-west2` for UK) and click **Enable**
+The Firebase home page is full of Gemini suggestion cards — ignore all of those. Instead:
+
+1. Click the small **`>` arrow** at the very bottom-left of the sidebar to expand it — this reveals the actual product menu
+2. In the expanded sidebar, click **Firestore Database** (under the "Build" section)
+3. Click **"Create database"**
+4. Select **"Start in test mode"** and click Next
+5. Pick the location closest to you (e.g. `europe-west2` for UK) and click **Enable**
+
+If you can't find the sidebar arrow, go directly to this URL (replace YOUR_PROJECT_ID with your project ID from the URL bar):
+`https://console.firebase.google.com/project/YOUR_PROJECT_ID/firestore`
 
 ## Step 3: Get Your Firebase Config (on your laptop)
 
