@@ -6,56 +6,115 @@ A shared shopping list app for you and your wife. Voice input, store tabs, and i
 
 ## What You Need
 
-- A laptop/computer (for the one-time setup)
-- Both your Android phones
-- A Google account (for Firebase - free)
+- **Your laptop** — for the one-time Firebase setup and deploy
+- **Both your Android phones** — to use the app
+- **A Google account** — for Firebase (completely free)
+- **Node.js on your laptop** — needed to deploy. If you don't have it, download the LTS version from https://nodejs.org/ and install it before starting
 
 ---
 
 ## Step 1: Create a Firebase Project (on your laptop)
 
-This is what syncs the list between your phones. It's free.
+Firebase is what syncs the list between your phones. It's free.
 
-1. Open **https://console.firebase.google.com/** in your browser
-2. Click **"Create a project"**
-3. Name it anything (e.g. "shopping-list") and click Continue
-4. Turn **off** Google Analytics (you don't need it) and click **Create project**
-5. Wait for it to finish, then click **Continue**
+1. Open your browser and go to **https://console.firebase.google.com/**
+2. Sign in with your Google account if prompted
+3. Click **"Create a project"** (or "Add project")
+4. **Project name:** Type anything, e.g. `shoppinglist`
+5. Click **Continue**
+6. It will ask about Google Analytics — **toggle it OFF** (you don't need it)
+7. Click **Create project**
+8. Wait 10-15 seconds for it to finish, then click **Continue**
 
-## Step 2: Enable the Database (on your laptop)
+You should now see your project's home page. It'll be full of Gemini AI suggestion cards — **ignore all of those**.
 
-The Firebase home page is full of Gemini suggestion cards — ignore all of those. Instead:
+---
 
-1. Click the small **`>` arrow** at the very bottom-left of the sidebar to expand it — this reveals the actual product menu
-2. In the expanded sidebar, click **Firestore Database** (under the "Build" section)
-3. Click **"Create database"**
-4. Select **"Start in test mode"** and click Next
-5. Pick the location closest to you (e.g. `europe-west2` for UK) and click **Enable**
+## Step 2: Create the Database (on your laptop)
 
-If you can't find the sidebar arrow, go directly to this URL (replace YOUR_PROJECT_ID with your project ID from the URL bar):
-`https://console.firebase.google.com/project/YOUR_PROJECT_ID/firestore`
+This is the database that stores your shopping list and syncs it between phones.
 
-## Step 3: Get Your Firebase Config (on your laptop)
+### Getting to Firestore
 
-1. Click the **Home** icon (top left) to go back to the project home page
-2. Click **"+ Add app"** (under the project name at the top)
-3. Click the **web icon** (`</>`)
-4. Enter any nickname (e.g. "shopping list") and click **Register app**
-5. You'll see a code block with `firebaseConfig = { ... }` - keep this page open, you need these values
+The sidebar on the left only shows a few small icons by default. Look for a small **`>` arrow at the very bottom-left** of the page and click it to expand the full sidebar menu. Then:
+
+1. In the expanded sidebar, look for **"Firestore Database"** and click it
+2. Click the **"Create database"** button
+
+**Can't find it?** Go directly to this URL in your browser:
+```
+https://console.firebase.google.com/project/YOUR-PROJECT-ID/firestore
+```
+(Replace `YOUR-PROJECT-ID` with your project name — check your browser's address bar to find it, it'll be something like `shoppinglist-a1b2c`)
+
+### The Create Database Wizard
+
+You'll see a 3-step wizard:
+
+#### Screen 1 — "Select edition"
+- You'll see two options: **Standard edition** and **Enterprise edition**
+- **Standard edition** should already be selected (it's highlighted in blue) — that's the right one
+- Click **Next**
+
+#### Screen 2 — "Database ID & location"
+- **Database ID:** Leave it as `(default)` — don't change this
+- **Location:** Click the dropdown and pick one close to you. For the UK, choose **`europe-west2 (London)`**
+- Click **Next**
+
+#### Screen 3 — "Configure"
+This is about security rules. You'll see two options:
+
+- **"Start in test mode"** — pick this one. It lets the app read and write data freely (fine for a personal app between you and your wife)
+- "Start in locked mode" — don't pick this
+
+Click **Create**
+
+Wait a few seconds. You'll then see the Firestore database page (it'll be empty — that's fine, the app creates everything it needs automatically).
+
+---
+
+## Step 3: Register a Web App & Get Your Config (on your laptop)
+
+Now you need to tell Firebase this is a web app, and get the connection details.
+
+1. Click the **Home icon** in the top-left of the sidebar (the little house) to go back to the project home page
+2. Under the project name at the top, you'll see a **"+ Add app"** button — click it
+3. You'll see icons for different platforms (iOS, Android, Web, Unity, Flutter). Click the **Web icon** — it looks like `</>`
+4. **App nickname:** Type anything, e.g. `shopping list`
+5. **Tick the box** that says "Also set up Firebase Hosting for this app" — this is important, it's how you'll publish the app
+6. Click **Register app**
+7. You'll now see a code block on screen. It contains something like this:
+
+```
+const firebaseConfig = {
+  apiKey: "AIzaSyB...",
+  authDomain: "shoppinglist-a1b2c.firebaseapp.com",
+  projectId: "shoppinglist-a1b2c",
+  storageBucket: "shoppinglist-a1b2c.firebasestorage.app",
+  messagingSenderId: "123456789012",
+  appId: "1:123456789012:web:abc123def456"
+};
+```
+
+8. **Keep this page open** or copy these values somewhere — you need them for the next step
+9. Click **Continue to console**
+
+---
 
 ## Step 4: Add Your Config to the App (on your laptop)
 
-1. Open the file `shopping-list-app/firebase-config.js` in a text editor
-2. Replace the contents with your values from Step 3. It should look like this:
+1. Open the file `shopping-list-app/firebase-config.js` in a text editor (VS Code, Notepad++, or even plain Notepad)
+2. Find the line that says `window.FIREBASE_CONFIG = null;`
+3. Replace the **entire file contents** with the following, using YOUR values from Step 3:
 
 ```js
 window.FIREBASE_CONFIG = {
-  apiKey: "AIzaSyB1234...",
-  authDomain: "shopping-list-abc.firebaseapp.com",
-  projectId: "shopping-list-abc",
-  storageBucket: "shopping-list-abc.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abc123def456"
+  apiKey: "AIzaSyB...",
+  authDomain: "shoppinglist-a1b2c.firebaseapp.com",
+  projectId: "shoppinglist-a1b2c",
+  storageBucket: "shoppinglist-a1b2c.firebasestorage.app",
+  messagingSenderId: "123456789012",
+  appId: "1:123456789012:web:abc123def456"
 };
 
 (function() {
@@ -79,97 +138,143 @@ window.FIREBASE_CONFIG = {
 })();
 ```
 
-3. Save the file
+4. **Important:** Only replace the values inside the quotes (apiKey, authDomain, etc.) with YOUR values. Keep everything else exactly as shown above
+5. Save the file
 
-## Step 5: Deploy the App (on your laptop)
+---
 
-You need Node.js installed. If you don't have it: **https://nodejs.org/** (download the LTS version).
+## Step 5: Deploy the App to the Internet (on your laptop)
 
-Open a terminal and run:
+This publishes your app so you can access it from your phones.
+
+1. Open a **terminal** (on Windows: search for "Command Prompt" or "PowerShell" in the Start menu)
+2. Run these commands one at a time:
 
 ```bash
-# Install Firebase CLI (one-time)
 npm install -g firebase-tools
+```
+This installs the Firebase command-line tool. You only need to do this once.
 
-# Login to Firebase
+```bash
 firebase login
+```
+A browser window will open asking you to sign in with Google. Sign in with the same Google account you used for Firebase, then come back to the terminal.
 
-# Go to the app folder
-cd shopping-list-app
+3. Now navigate to the app folder. If the repo is on your desktop:
 
-# Set up hosting
+```bash
+cd Desktop/new_damn_repo/shopping-list-app
+```
+
+(Adjust the path to wherever the `shopping-list-app` folder actually is on your laptop)
+
+4. Set up hosting:
+
+```bash
 firebase init hosting
 ```
 
-When it asks:
-- **Select a project** → pick the one you created in Step 1
-- **Public directory** → type `.` (just a dot)
-- **Single-page app** → type `y`
-- **Overwrite index.html** → type `N`
+It will ask you a series of questions. Answer them exactly like this:
 
-Then deploy:
+| Question | Your answer |
+|----------|-------------|
+| **Please select an option:** | `Use an existing project` (use arrow keys, press Enter) |
+| **Select a default Firebase project:** | Pick the project you created in Step 1 |
+| **What do you want to use as your public directory?** | Type `.` (just a single dot) and press Enter |
+| **Configure as a single-page app?** | Type `y` and press Enter |
+| **Set up automatic builds and deploys with GitHub?** | Type `N` and press Enter |
+| **File ./index.html already exists. Overwrite?** | Type `N` and press Enter |
+
+5. Now deploy:
 
 ```bash
 firebase deploy
 ```
 
-It will give you a URL like `https://shopping-list-abc.web.app` — **this is your app!**
+6. When it finishes, it will show you a **Hosting URL** like:
+```
+https://shoppinglist-a1b2c.web.app
+```
 
-## Step 6: Install on Your Phone (on your Android phone)
-
-1. Open **Chrome** on your Android phone
-2. Go to the URL from Step 5 (e.g. `https://shopping-list-abc.web.app`)
-3. Chrome will show a banner saying **"Add to Home screen"** — tap it
-   - If no banner appears: tap the **three dots menu** (top right) → **"Add to Home screen"** → **"Add"**
-4. The app icon now appears on your home screen like a normal app
-
-## Step 7: Create and Share Your List ID (on your phone)
-
-This is how both phones see the same list:
-
-1. Open the app
-2. Tap the **⚙ settings icon** (top right)
-3. Tap **"New"** to generate a list ID
-4. Tap **"Apply"** — you should see "Connected & syncing" in green
-5. Tap **"Share via WhatsApp"** — this opens WhatsApp with a message containing the list ID and instructions for your wife
-
-## Step 8: Your Wife's Phone (on her Android phone)
-
-1. She opens the WhatsApp message you sent
-2. She taps the link to open the app in Chrome
-3. She adds it to her home screen (same as Step 6)
-4. She opens the app, taps **⚙ settings**
-5. She pastes the list ID from the WhatsApp message
-6. She taps **"Apply"**
-7. Done — you're both synced!
+**This is your app's URL! Write it down or copy it.** This is what you'll open on your phones.
 
 ---
 
-## How to Use It
+## Step 6: Add the App to Your Phone (on your Android phone)
+
+1. Open **Chrome** on your phone (it must be Chrome, not Samsung Internet or another browser)
+2. Type in the URL from Step 5 (e.g. `https://shoppinglist-a1b2c.web.app`)
+3. The app should load and you'll see "The Shopping List" with a dark background
+4. To add it to your home screen so it behaves like a real app:
+   - Tap the **three-dot menu** (top-right corner of Chrome)
+   - Tap **"Add to Home screen"** (or "Install app" if it shows that)
+   - Tap **Add**
+5. You'll now have an app icon on your home screen — tap it to open. It runs fullscreen like a proper app
+
+---
+
+## Step 7: Link Your Phones Together (on your phone, then WhatsApp)
+
+This is what makes sure you and your wife both see the same list.
+
+1. Open the app on your phone
+2. Tap the **settings icon** in the top-right corner (it looks like a small sun/gear)
+3. Scroll down to the **"Sync Status"** section
+4. Tap the **"New"** button — this generates a random list ID (something like `k7x2m9p4`)
+5. Tap **"Apply"** — the status should change to **"Connected & syncing"** in green
+6. Tap **"Share via WhatsApp"** — this opens WhatsApp with a pre-written message containing:
+   - The link to the app
+   - The list ID
+   - Instructions for your wife
+
+Send it to your wife.
+
+---
+
+## Step 8: Your Wife Sets Up (on her Android phone)
+
+Your wife needs to:
+
+1. Open the WhatsApp message you sent
+2. Tap the **link** in the message to open the app in Chrome
+3. Add it to her home screen (same as Step 6 — three-dot menu → "Add to Home screen")
+4. Open the app from her home screen
+5. Tap the **settings icon** (top-right)
+6. In the **List ID** field, paste the ID from the WhatsApp message
+7. Tap **"Apply"**
+8. It should say **"Connected & syncing"** in green
+
+**That's it — you're both synced!** Anything either of you adds will appear on both phones instantly.
+
+---
+
+## How to Use the App
 
 ### Adding Items
-- **Voice**: Tap the mic button and say something like:
+- **By voice:** Tap the blue **microphone button** and say something like:
   - "tinned plum tomatoes Aldi"
   - "GF bread Sainsbury's"
-  - "salted peanuts"  (adds to whichever store tab you're on)
-- **Type**: Type in the text box, e.g. `milk - Aldi` and tap +
+  - "salted peanuts" (adds to whichever store tab you're currently on)
+- **By typing:** Type in the text box at the bottom (e.g. `milk - Aldi`) and tap the **+** button
+
+The app recognises store names even with variations — "Sainsbury's", "Sainsburys", "sainos" all work.
+
+### Store Tabs
+- Items are grouped by store — tap a tab to see just that store's items
+- The **"All"** tab shows everything grouped by store
+- To add a new store, either say its name when adding an item (e.g. "eggs Lidl" creates a Lidl tab), or tap the **+** button next to the tabs
 
 ### Ticking Items Off
-- Tap the circle next to an item to mark it as bought
-- It will ask **"Where did you find this?"** — tap the aisle, side, and position
-- Tap **Skip** if you don't want to record the aisle
-- Next time you add that item to that store, the aisle info shows automatically
+- Tap the **circle** next to an item to tick it as bought
+- A popup asks **"Where did you find this?"** — choose the aisle, which side, and how far along
+- Tap **Skip** if you can't be bothered right now
+- **The app remembers!** Next time you add that item to that store, it automatically shows where to find it
 
-### Aisle System
-- **Aisle number**: The aisle number in the store
-- **Side**: Left or Right as you walk into the aisle
-- **Position**: Start (near entrance), Middle, or End (far end)
-- **Split aisles** (for big Sainsbury's): Go to Settings → toggle "Split aisles" for that store. This adds Front half (A) / Back half (B) — A is the entrance side of the walkway, B is the far side
+### The Aisle System
+- **Aisle number:** The aisle number in the store (use the +/- buttons)
+- **Side:** Left or Right as you walk into the aisle
+- **Position:** Start (near where you entered the aisle), Middle, or End (far end)
+- **For large stores like Sainsbury's** where aisles are split by a walkway down the middle: Go to Settings and toggle **"Split aisles"** on for that store. This adds a **Front half (A)** / **Back half (B)** choice — A is the half nearest the entrance, B is the far half
 
-### Managing Stores
-- Say a new store name when adding an item and it auto-creates the tab
-- Or tap the **+** button next to the tabs
-- Remove stores in Settings
-
-### Clearing the List
-- After a shop, go to Settings → **"Remove all ticked items"** to clear everything you've bought
+### After Shopping
+Go to Settings → tap **"Remove all ticked items"** to clear everything you've bought, leaving unticked items for next time.
