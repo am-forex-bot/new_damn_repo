@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>The Shopping List</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header id="header">
+      <h1>The Shopping List</h1>
+      <div class="header-actions">
+        <button id="btn-settings" class="icon-btn" aria-label="Settings">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Store Tabs -->
+    <div id="tabs-container">
+      <div id="tabs" class="tabs-scroll">
+        <!-- Tabs populated by JS -->
+      </div>
+      <button id="btn-add-store" class="add-store-btn" aria-label="Add store">+</button>
+    </div>
+
+    <!-- Shopping List -->
+    <main id="list-container">
+      <div id="empty-state" class="empty-state">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
+          <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0"/>
+        </svg>
+        <p>No items yet</p>
+        <p class="sub">Tap the mic and say something like<br>"tinned tomatoes" or type below</p>
+      </div>
+      <ul id="shopping-list">
+        <!-- Items populated by JS -->
+      </ul>
+    </main>
+
+    <!-- Input Bar -->
+    <div id="input-bar">
+      <button id="btn-mic" class="mic-btn" aria-label="Voice input">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="9" y="1" width="6" height="11" rx="3"/>
+          <path d="M19 10v1a7 7 0 01-14 0v-1M12 18.5V23M8 23h8"/>
+        </svg>
+      </button>
+      <input type="text" id="text-input" placeholder='e.g. "milk - Aldi"' autocomplete="off">
+      <button id="btn-add" class="add-btn" aria-label="Add item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+    </div>
+
+    <!-- Voice Listening Overlay -->
+    <div id="voice-overlay" class="hidden">
+      <div class="voice-modal">
+        <div class="voice-pulse"></div>
+        <p id="voice-status">Listening...</p>
+        <p id="voice-transcript" class="transcript"></p>
+        <button id="btn-voice-cancel" class="voice-cancel">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Aisle Picker Modal -->
+    <div id="aisle-modal" class="hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <h3>Where did you find this?</h3>
+        <p id="aisle-item-name" class="aisle-item-label"></p>
+
+        <div class="aisle-form">
+          <label>Aisle number</label>
+          <div class="aisle-number-row">
+            <button class="aisle-num-btn" data-delta="-1">-</button>
+            <input type="number" id="aisle-number" value="1" min="1" max="50">
+            <button class="aisle-num-btn" data-delta="1">+</button>
+          </div>
+
+          <div id="aisle-half-section" class="hidden">
+            <label>Which half?</label>
+            <div class="toggle-group">
+              <button class="toggle-btn active" data-value="A">Front half (A)</button>
+              <button class="toggle-btn" data-value="B">Back half (B)</button>
+            </div>
+          </div>
+
+          <label>Which side?</label>
+          <div class="toggle-group">
+            <button class="toggle-btn active" data-value="L">Left</button>
+            <button class="toggle-btn" data-value="R">Right</button>
+          </div>
+
+          <label>How far along?</label>
+          <div class="toggle-group triple">
+            <button class="toggle-btn" data-value="1">Start</button>
+            <button class="toggle-btn active" data-value="2">Middle</button>
+            <button class="toggle-btn" data-value="3">End</button>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button id="btn-aisle-skip" class="btn-secondary">Skip</button>
+          <button id="btn-aisle-save" class="btn-primary">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content settings-content">
+        <h3>Settings</h3>
+
+        <div class="setting-group">
+          <label>Manage Stores</label>
+          <div id="store-list-settings">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <label>Store has split aisles?</label>
+          <p class="setting-hint">For large stores (like big Sainsbury's) where aisles are split by a walkway</p>
+          <div id="split-aisle-toggles">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <label>Sync Status</label>
+          <p id="sync-status" class="sync-indicator">Checking...</p>
+          <p class="setting-hint">Share this list ID with your partner so you both see the same list</p>
+          <div class="list-id-row">
+            <input type="text" id="list-id-input" placeholder="Enter or generate list ID">
+            <button id="btn-generate-id" class="btn-small">New</button>
+            <button id="btn-apply-id" class="btn-small btn-primary">Apply</button>
+          </div>
+          <button id="btn-copy-id" class="btn-secondary full-width">Copy List ID to Share</button>
+        </div>
+
+        <div class="setting-group">
+          <label>Clear Completed Items</label>
+          <button id="btn-clear-completed" class="btn-secondary full-width">Remove all ticked items</button>
+        </div>
+
+        <div class="modal-actions">
+          <button id="btn-settings-close" class="btn-primary">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Store Modal -->
+    <div id="add-store-modal" class="hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <h3>Add Store</h3>
+        <input type="text" id="new-store-name" placeholder="Store name (e.g. Lidl)">
+        <div class="modal-actions">
+          <button id="btn-store-cancel" class="btn-secondary">Cancel</button>
+          <button id="btn-store-save" class="btn-primary">Add</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="firebase-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
