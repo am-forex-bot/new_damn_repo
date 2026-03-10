@@ -9,19 +9,14 @@
 //
 // Without Firebase, the app works fully offline with local storage.
 
-window.FIREBASE_CONFIG = null; // Set to null to disable sync
-
-// To enable sync, uncomment and fill in your Firebase config:
-/*
 window.FIREBASE_CONFIG = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyAs9FHW320-qBf12d1oowfSstNTZSEziQk",
+  authDomain: "shoppingapp-dc006.firebaseapp.com",
+  projectId: "shoppingapp-dc006",
+  storageBucket: "shoppingapp-dc006.firebasestorage.app",
+  messagingSenderId: "32827592159",
+  appId: "1:32827592159:web:682caa4fd3743dd25b086a"
 };
-*/
 
 // Load Firebase SDK dynamically only if config is set
 (function() {
