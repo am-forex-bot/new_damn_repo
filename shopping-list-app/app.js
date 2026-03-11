@@ -172,6 +172,15 @@
     return id;
   }
 
+  function shareViaWhatsApp() {
+    if (!state.listId) { toast('Set up a list first'); return; }
+    const base = window.location.origin + window.location.pathname;
+    const appUrl = base + '?list=' + encodeURIComponent(state.listId);
+    const msg = `Tap here for this week's shop: ${appUrl}`;
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, '_blank');
+  }
+
   // ---- Rendering ----
   function renderTabs() {
     els.tabs.innerHTML = '';
@@ -252,7 +261,45 @@
       });
     } else {
       items.forEach(item => els.list.appendChild(createItemEl(item)));
+
+      // Show "End Shop" button if there are unchecked items and a next store exists
+      const storeIdx = state.stores.indexOf(state.activeStore);
+      const uncheckedCount = items.filter(i => !i.completed).length;
+      if (storeIdx >= 0 && storeIdx < state.stores.length - 1 && uncheckedCount > 0) {
+        const nextStore = state.stores[storeIdx + 1];
+        const endShopBtn = document.createElement('li');
+        endShopBtn.className = 'end-shop-row';
+        endShopBtn.innerHTML = `
+          <button class="btn-end-shop" id="btn-end-shop">
+            End shop \u2014 move ${uncheckedCount} item${uncheckedCount > 1 ? 's' : ''} to ${escapeHtml(nextStore)}
+          </button>
+        `;
+        endShopBtn.querySelector('button').addEventListener('click', () => endShop(state.activeStore));
+        els.list.appendChild(endShopBtn);
+      }
     }
+  }
+
+  function endShop(store) {
+    const storeIdx = state.stores.indexOf(store);
+    if (storeIdx < 0 || storeIdx >= state.stores.length - 1) return;
+    const nextStore = state.stores[storeIdx + 1];
+
+    const unchecked = state.items.filter(i => i.store === store && !i.completed);
+    if (unchecked.length === 0) return;
+
+    unchecked.forEach(item => {
+      item.store = nextStore;
+      // Check if we have aisle memory for this item in the new store
+      const memoryKey = `${nextStore}::${normalizeItemName(item.name)}`;
+      item.aisleInfo = state.aisleMemory[memoryKey] || null;
+    });
+
+    state.activeStore = nextStore;
+    syncToCloud();
+    renderTabs();
+    renderList();
+    toast(`Moved ${unchecked.length} item${unchecked.length > 1 ? 's' : ''} to ${nextStore}`);
   }
 
   function aisleSort(info) {
@@ -671,35 +718,27 @@
 
     els.btnApplyId.addEventListener('click', () => {
       const id = els.listIdInput.value.trim().toLowerCase();
-      if (!id) { toast('Enter a list ID'); return; }
+      if (!id) { toast('Enter a list code'); return; }
       state.listId = id;
       saveLocalState();
       startSync();
-      toast('List ID applied - syncing!');
+      toast('Joined list - syncing!');
+      updateSyncUI();
     });
 
-    els.btnCopyId.addEventListener('click', () => {
-      if (!state.listId) { toast('Generate or enter a list ID first'); return; }
-      navigator.clipboard.writeText(state.listId).then(() => {
-        toast('List ID copied! Share it with your partner');
-      }).catch(() => {
-        // Fallback
-        els.listIdInput.value = state.listId;
-        els.listIdInput.select();
-        toast('Copy the ID from the field above');
-      });
+    els.btnCopyId.addEventListener('click', () => {});
+
+    // Set Up New List - one tap: generate, apply, show share
+    $('#btn-new-list').addEventListener('click', () => {
+      const id = generateListId();
+      state.listId = id;
+      saveLocalState();
+      startSync();
+      toast('New list created!');
+      updateSyncUI();
     });
 
-    els.btnWhatsappShare.addEventListener('click', () => {
-      if (!state.listId) { toast('Generate or enter a list ID first'); return; }
-      const base = window.location.origin + window.location.pathname;
-      const appUrl = base + '?list=' + encodeURIComponent(state.listId);
-      const msg = `Hey! Here's our shared shopping list 🛒\n\n` +
-        `Tap this link and it'll set everything up automatically:\n${appUrl}\n\n` +
-        `Then add it to your home screen (Chrome menu → "Add to Home screen") so it works like an app.`;
-      const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
-      window.open(waUrl, '_blank');
-    });
+    els.btnWhatsappShare.addEventListener('click', () => shareViaWhatsApp());
 
     els.btnClearCompleted.addEventListener('click', () => {
       const count = state.items.filter(i => i.completed).length;
@@ -743,8 +782,26 @@
   }
 
   // ---- Settings ----
+  function updateSyncUI() {
+    const hasId = !!state.listId;
+    const newListBtn = $('#btn-new-list');
+    const whatsappBtn = els.btnWhatsappShare;
+    const joinSection = $('#join-list-section');
+
+    if (hasId) {
+      newListBtn.textContent = 'Start New List (current: ' + state.listId + ')';
+      whatsappBtn.classList.remove('hidden');
+      joinSection.classList.add('hidden');
+    } else {
+      newListBtn.textContent = 'Set Up New List';
+      whatsappBtn.classList.add('hidden');
+      joinSection.classList.remove('hidden');
+    }
+  }
+
   function showSettings() {
     els.listIdInput.value = state.listId || '';
+    updateSyncUI();
 
     // Render store list
     els.storeListSettings.innerHTML = '';
@@ -816,9 +873,22 @@
   }
 
   function registerServiceWorker() {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
-    }
+    if (!('serviceWorker' in navigator)) return;
+
+    navigator.serviceWorker.register('sw.js').then((reg) => {
+      // Check for updates every 60 seconds
+      setInterval(() => reg.update(), 60000);
+
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'activated') {
+            // New version active - reload to get fresh files
+            window.location.reload();
+          }
+        });
+      });
+    }).catch(() => {});
   }
 
   // ---- Boot ----

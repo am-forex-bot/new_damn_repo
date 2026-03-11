@@ -137,16 +137,20 @@
         </div>
 
         <div class="setting-group">
-          <label>Sync Status</label>
+          <label>Sync Between Devices</label>
           <p id="sync-status" class="sync-indicator">Checking...</p>
-          <p class="setting-hint">Share this list ID with your partner so you both see the same list</p>
-          <div class="list-id-row">
-            <input type="text" id="list-id-input" placeholder="Enter or generate list ID">
-            <button id="btn-generate-id" class="btn-small">New</button>
-            <button id="btn-apply-id" class="btn-small btn-primary">Apply</button>
+          <button id="btn-new-list" class="btn-primary full-width">Set Up New List</button>
+          <button id="btn-whatsapp-share" class="btn-whatsapp full-width hidden">Share via WhatsApp</button>
+          <div id="join-list-section" class="join-section">
+            <p class="setting-hint" style="margin-top:12px">Got a code from someone? Enter it below</p>
+            <div class="list-id-row">
+              <input type="text" id="list-id-input" placeholder="Enter list code">
+              <button id="btn-apply-id" class="btn-small btn-primary">Join</button>
+            </div>
           </div>
-          <button id="btn-copy-id" class="btn-secondary full-width">Copy List ID</button>
-          <button id="btn-whatsapp-share" class="btn-whatsapp full-width">Share via WhatsApp</button>
+          <!-- Hidden elements kept for backwards compat -->
+          <button id="btn-generate-id" class="hidden"></button>
+          <button id="btn-copy-id" class="hidden"></button>
         </div>
 
         <div class="setting-group">

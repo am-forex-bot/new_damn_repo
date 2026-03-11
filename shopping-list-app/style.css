@@ -250,6 +250,32 @@ body {
   .item-delete { opacity: 0.5; }
 }
 
+/* ===== End Shop ===== */
+.end-shop-row {
+  list-style: none;
+  padding: 16px 4px 8px;
+}
+.btn-end-shop {
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: var(--radius);
+  border: 2px dashed var(--accent-dim);
+  background: rgba(76, 201, 240, 0.08);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.btn-end-shop:active {
+  background: rgba(76, 201, 240, 0.15);
+  transform: scale(0.98);
+}
+
+/* ===== Join Section ===== */
+.join-section.hidden { display: none; }
+
 /* ===== Input Bar ===== */
 #input-bar {
   display: flex;
