@@ -4,8 +4,8 @@
   "description": "Shared shopping list with voice input and aisle memory",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#0f0f1a",
-  "theme_color": "#1a1a2e",
+  "background_color": "#f0f4f8",
+  "theme_color": "#f0f4f8",
   "orientation": "portrait",
   "icons": [
     {

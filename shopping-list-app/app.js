@@ -3,6 +3,26 @@
 (function () {
   'use strict';
 
+  // ---- Store Branding ----
+  const STORE_BRANDS = {
+    'Aldi':        { color: '#00508F', bg: 'rgba(0,80,143,0.12)', icon: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 2L2 9h3v11h14V9h3L12 2z" fill="#00508F"/><text x="12" y="17" text-anchor="middle" font-size="7" font-weight="bold" fill="#fff">A</text></svg>' },
+    "Sainsbury's": { color: '#F06C00', bg: 'rgba(240,108,0,0.12)', icon: '<svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="10" fill="#F06C00"/><text x="12" y="16" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">S</text></svg>' },
+    'Tesco':       { color: '#EE1C2E', bg: 'rgba(238,28,46,0.12)', icon: '<svg viewBox="0 0 24 24" width="18" height="18"><rect x="2" y="6" width="20" height="12" rx="2" fill="#EE1C2E"/><text x="12" y="16" text-anchor="middle" font-size="8" font-weight="bold" fill="#fff">T</text></svg>' },
+    'Lidl':        { color: '#0050AA', bg: 'rgba(0,80,170,0.12)', icon: '<svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="10" fill="#FDE100" stroke="#0050AA" stroke-width="2"/><text x="12" y="16" text-anchor="middle" font-size="9" font-weight="bold" fill="#0050AA">L</text></svg>' },
+    'Asda':        { color: '#78BE20', bg: 'rgba(120,190,32,0.12)', icon: '<svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="10" fill="#78BE20"/><text x="12" y="16" text-anchor="middle" font-size="9" font-weight="bold" fill="#fff">A</text></svg>' },
+    'Morrisons':   { color: '#007A3D', bg: 'rgba(0,122,61,0.12)', icon: '<svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="10" fill="#007A3D"/><text x="12" y="16" text-anchor="middle" font-size="8" font-weight="bold" fill="#FFC72C">M</text></svg>' },
+    'Waitrose':    { color: '#5C8A3C', bg: 'rgba(92,138,60,0.12)', icon: '<svg viewBox="0 0 24 24" width="18" height="18"><rect x="2" y="6" width="20" height="12" rx="2" fill="#5C8A3C"/><text x="12" y="16" text-anchor="middle" font-size="7" font-weight="bold" fill="#fff">W</text></svg>' },
+    'Co-op':       { color: '#00B1E7', bg: 'rgba(0,177,231,0.12)', icon: '<svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="10" fill="#00B1E7"/><text x="12" y="16" text-anchor="middle" font-size="7" font-weight="bold" fill="#fff">Co</text></svg>' },
+    'M&S':         { color: '#000000', bg: 'rgba(0,0,0,0.12)', icon: '<svg viewBox="0 0 24 24" width="18" height="18"><rect x="2" y="6" width="20" height="12" rx="2" fill="#1B4D3E"/><text x="12" y="16" text-anchor="middle" font-size="7" font-weight="bold" fill="#C5A961">M&amp;S</text></svg>' },
+    'Iceland':     { color: '#E30613', bg: 'rgba(227,6,19,0.12)', icon: '<svg viewBox="0 0 24 24" width="18" height="18"><rect x="2" y="6" width="20" height="12" rx="2" fill="#E30613"/><text x="12" y="16" text-anchor="middle" font-size="7" font-weight="bold" fill="#fff">Ic</text></svg>' },
+    'Costco':      { color: '#E31837', bg: 'rgba(227,24,55,0.12)', icon: '<svg viewBox="0 0 24 24" width="18" height="18"><rect x="2" y="6" width="20" height="12" rx="2" fill="#E31837"/><text x="12" y="16" text-anchor="middle" font-size="7" font-weight="bold" fill="#fff">C</text></svg>' },
+  };
+  const DEFAULT_BRAND = { color: '#4cc9f0', bg: 'rgba(76,201,240,0.12)', icon: '<svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="10" fill="none" stroke="#4cc9f0" stroke-width="2"/><path d="M7 13l3 3 7-7" stroke="#4cc9f0" stroke-width="2" fill="none"/></svg>' };
+
+  function getStoreBrand(store) {
+    return STORE_BRANDS[store] || DEFAULT_BRAND;
+  }
+
   // ---- State ----
   const DEFAULT_STORES = ['Aldi', "Sainsbury's"];
   let state = {
@@ -212,7 +232,15 @@
   function createTab(name, count, active) {
     const btn = document.createElement('button');
     btn.className = 'tab-btn' + (active ? ' active' : '');
-    btn.innerHTML = `${name}<span class="tab-count">${count || ''}</span>`;
+
+    if (name === 'All') {
+      btn.innerHTML = `<span class="tab-icon"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg></span>All<span class="tab-count">${count || ''}</span>`;
+    } else {
+      const brand = getStoreBrand(name);
+      btn.style.setProperty('--store-color', brand.color);
+      btn.style.setProperty('--store-bg', brand.bg);
+      btn.innerHTML = `<span class="tab-icon">${brand.icon}</span>${escapeHtml(name)}<span class="tab-count">${count || ''}</span>`;
+    }
     return btn;
   }
 
@@ -251,11 +279,10 @@
         grouped[item.store].push(item);
       });
       Object.keys(grouped).forEach(store => {
+        const brand = getStoreBrand(store);
         const header = document.createElement('li');
-        header.className = 'list-item';
-        header.style.background = 'transparent';
-        header.style.padding = '8px 4px 4px';
-        header.innerHTML = `<span style="font-weight:700;color:var(--accent);font-size:13px;text-transform:uppercase;letter-spacing:0.5px">${store}</span>`;
+        header.className = 'store-group-header';
+        header.innerHTML = `<span class="store-group-icon">${brand.icon}</span><span class="store-group-name" style="color:${brand.color}">${escapeHtml(store)}</span>`;
         els.list.appendChild(header);
         grouped[store].forEach(item => els.list.appendChild(createItemEl(item)));
       });
@@ -267,10 +294,12 @@
       const uncheckedCount = items.filter(i => !i.completed).length;
       if (storeIdx >= 0 && storeIdx < state.stores.length - 1 && uncheckedCount > 0) {
         const nextStore = state.stores[storeIdx + 1];
+        const nextBrand = getStoreBrand(nextStore);
         const endShopBtn = document.createElement('li');
         endShopBtn.className = 'end-shop-row';
         endShopBtn.innerHTML = `
-          <button class="btn-end-shop" id="btn-end-shop">
+          <button class="btn-end-shop" style="border-color:${nextBrand.color};background:${nextBrand.bg};color:${nextBrand.color}">
+            <span class="end-shop-icon">${nextBrand.icon}</span>
             End shop \u2014 move ${uncheckedCount} item${uncheckedCount > 1 ? 's' : ''} to ${escapeHtml(nextStore)}
           </button>
         `;
