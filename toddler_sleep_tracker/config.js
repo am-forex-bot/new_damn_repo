@@ -9,10 +9,10 @@
 //  Access is protected by Firestore security rules + your shared passcode.
 // ---------------------------------------------------------------------------
 window.FIREBASE_CONFIG = {
-  apiKey: "PASTE_API_KEY_HERE",
-  authDomain: "PASTE_PROJECT.firebaseapp.com",
-  projectId: "PASTE_PROJECT_ID",
-  storageBucket: "PASTE_PROJECT.appspot.com",
-  messagingSenderId: "PASTE_SENDER_ID",
-  appId: "PASTE_APP_ID"
+  apiKey: "AIzaSyBj3RL1k0U2UV6NICVC2iRg3DVOi2Js5Tk",
+  authDomain: "safisleeptracker.firebaseapp.com",
+  projectId: "safisleeptracker",
+  storageBucket: "safisleeptracker.firebasestorage.app",
+  messagingSenderId: "1023835300040",
+  appId: "1:1023835300040:web:a9223dae0ab87fed4f85fd"
 };
