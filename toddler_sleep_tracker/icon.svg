@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#4f46e5"/>
+  <path d="M330 300a118 118 0 1 1-130-163 92 92 0 0 0 130 163z" fill="#fde68a"/>
+  <g fill="#fff" font-family="Arial, sans-serif" font-weight="700">
+    <text x="300" y="180" font-size="70">z</text>
+    <text x="350" y="135" font-size="50">z</text>
+    <text x="390" y="100" font-size="34">z</text>
+  </g>
+</svg>
