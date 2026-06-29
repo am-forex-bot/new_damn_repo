@@ -13,7 +13,7 @@
 <style>
   :root{
     --bg:#0f172a; --card:#1e293b; --card2:#273449; --ink:#e2e8f0; --muted:#94a3b8;
-    --accent:#818cf8; --accent2:#34d399; --warn:#fbbf24; --line:#334155;
+    --accent:#818cf8; --accent2:#34d399; --warn:#fbbf24; --bad:#f87171; --line:#334155;
     --radius:16px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -22,17 +22,22 @@
   body{padding:env(safe-area-inset-top) env(safe-area-inset-right)
         calc(env(safe-area-inset-bottom) + 24px) env(safe-area-inset-left);}
   header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,#4f46e5,#4338ca);
-    color:#fff;padding:calc(env(safe-area-inset-top) + 16px) 18px 16px;
+    color:#fff;padding:calc(env(safe-area-inset-top) + 14px) 18px 14px;
     box-shadow:0 2px 12px rgba(0,0,0,.4);}
-  header h1{margin:0;font-size:20px;font-weight:700;letter-spacing:.2px;display:flex;align-items:center;gap:8px}
-  header p{margin:4px 0 0;font-size:13px;opacity:.85}
+  header .top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  header h1{margin:0;font-size:19px;font-weight:700;letter-spacing:.2px;display:flex;align-items:center;gap:8px}
+  .sync{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;
+    background:rgba(255,255,255,.15);padding:5px 10px;border-radius:999px;white-space:nowrap}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--accent2);box-shadow:0 0 0 0 rgba(52,211,153,.6)}
+  .dot.saving{background:var(--warn)}
+  .dot.offline{background:var(--bad)}
   main{max-width:560px;margin:0 auto;padding:16px;}
   .card{background:var(--card);border-radius:var(--radius);padding:16px;margin:0 0 16px;
     border:1px solid var(--line);}
   .card h2{margin:0 0 12px;font-size:15px;font-weight:700;color:var(--ink);}
   label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px;font-weight:600}
   .field{margin-bottom:14px}
-  input[type=time],input[type=date]{
+  input[type=time],input[type=date],input[type=password],input[type=text]{
     width:100%;font-size:17px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);
     background:var(--card2);color:var(--ink);appearance:none;-webkit-appearance:none;}
   input:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}
@@ -67,12 +72,65 @@
     font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .25s;z-index:50}
   .savedflash.show{opacity:1}
   footer{text-align:center;color:var(--muted);font-size:11px;padding:8px 0 0}
+  /* gate / overlay screens */
+  .overlay{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;align-items:center;
+    justify-content:center;padding:24px;}
+  .gate{max-width:380px;width:100%;text-align:center}
+  .gate .moon{font-size:54px;margin-bottom:8px}
+  .gate h1{font-size:22px;margin:0 0 6px}
+  .gate p{color:var(--muted);font-size:14px;margin:0 0 20px;line-height:1.5}
+  .gate .field{text-align:left}
+  .gate .err{color:var(--bad);font-size:13px;font-weight:600;min-height:18px;margin:6px 0 0}
+  .spinner{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:spin 1s linear infinite;margin:0 auto}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .hidden{display:none !important}
 </style>
 </head>
 <body>
+
+<!-- ===== Passcode gate ===== -->
+<div class="overlay" id="gateScreen">
+  <div class="gate">
+    <div class="moon">🌙</div>
+    <h1>Toddler Sleep</h1>
+    <p>Enter your shared family passcode. Use the <b>same passcode</b> on both
+       phones to see each other's entries in real time.</p>
+    <div class="field">
+      <label for="pc">Family passcode</label>
+      <input type="password" id="pc" autocomplete="off" inputmode="text" placeholder="••••••••" />
+    </div>
+    <button class="btn block" id="enterBtn">Continue</button>
+    <div class="err" id="gateErr"></div>
+  </div>
+</div>
+
+<!-- ===== Loading ===== -->
+<div class="overlay hidden" id="loadScreen">
+  <div class="gate">
+    <div class="spinner"></div>
+    <p style="margin-top:16px" id="loadMsg">Connecting…</p>
+  </div>
+</div>
+
+<!-- ===== Setup-needed (config not filled in) ===== -->
+<div class="overlay hidden" id="setupScreen">
+  <div class="gate">
+    <div class="moon">⚙️</div>
+    <h1>Almost there</h1>
+    <p>The app isn't connected to a database yet. The Firebase config in
+       <code>config.js</code> still has placeholder values. Once that's filled
+       in and deployed, real-time sync will work.</p>
+  </div>
+</div>
+
+<!-- ===== Main app ===== -->
+<div id="app" class="hidden">
 <header>
-  <h1>🌙 Toddler Sleep Tracker</h1>
-  <p>Log the day's sleep — totals &amp; wake windows calculate automatically.</p>
+  <div class="top">
+    <h1>🌙 Sleep Tracker</h1>
+    <div class="sync" id="syncBadge"><span class="dot" id="syncDot"></span><span id="syncText">Synced</span></div>
+  </div>
 </header>
 
 <main>
@@ -108,6 +166,7 @@
       </div>
     </div>
     <button class="btn block" id="saveBtn">Save day</button>
+    <p class="muted" style="text-align:center;margin:10px 0 0">Changes save &amp; sync automatically.</p>
   </div>
 
   <div class="card">
@@ -145,276 +204,248 @@
   </div>
 
   <div class="card">
-    <h2>Your data</h2>
-    <p class="muted" style="margin-top:0">Everything is saved on this device only. Export to keep a backup.</p>
+    <h2>Backup &amp; account</h2>
+    <p class="muted" style="margin-top:0">Data lives in the shared cloud database and syncs across both phones automatically. You can still export a snapshot.</p>
     <div class="tools">
       <button class="btn ghost" id="exportCsv">Export CSV</button>
       <button class="btn ghost" id="exportJson">Backup JSON</button>
-      <button class="btn ghost" id="importJson">Restore JSON</button>
     </div>
-    <input type="file" id="importFile" accept="application/json" style="display:none" />
+    <div style="margin-top:12px">
+      <button class="btn ghost block" id="signOut">Sign out / change passcode</button>
+    </div>
   </div>
 
-  <footer>Add to Home Screen for a full-screen app · works offline</footer>
+  <footer>Add to Home Screen for a full-screen app · syncs in real time</footer>
 </main>
+</div>
 
 <div class="savedflash" id="flash">Saved ✓</div>
 
-<script>
+<!-- Firebase config (edit config.js with your project's keys) -->
+<script src="config.js"></script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+         collection, doc, setDoc, deleteDoc, onSnapshot }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
 "use strict";
-
-const KEY = "toddlerSleep.v1";
-const FIELDS = ["morningWake","napStart","napEnd","bedStart","fallAsleep"];
-
 const $ = (id) => document.getElementById(id);
-
-/* ---------- storage ---------- */
-function loadAll(){
-  try { return JSON.parse(localStorage.getItem(KEY)) || {}; }
-  catch(e){ return {}; }
-}
-function saveAll(data){ localStorage.setItem(KEY, JSON.stringify(data)); }
-
-/* ---------- date helpers ---------- */
-function isoToday(){
-  const d = new Date();
-  const off = d.getTimezoneOffset();
-  return new Date(d.getTime() - off*60000).toISOString().slice(0,10);
-}
-function prevIso(iso){
-  const d = new Date(iso + "T00:00:00");
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0,10);
-}
-function prettyDate(iso){
-  const d = new Date(iso + "T00:00:00");
-  return d.toLocaleDateString(undefined,{weekday:"short", month:"short", day:"numeric"});
-}
+const FIELDS = ["morningWake","napStart","napEnd","bedStart","fallAsleep"];
+const PC_KEY = "toddlerSleep.passcode";
 
 /* ---------- time math (minutes since midnight) ---------- */
-function toMin(t){
-  if(!t) return null;
-  const [h,m] = t.split(":").map(Number);
-  if(Number.isNaN(h)||Number.isNaN(m)) return null;
-  return h*60+m;
-}
-// same-day gap a -> b; if b earlier than a, assume it crossed midnight
-function diff(a,b){
-  if(a==null||b==null) return null;
-  let d = b - a;
-  if(d < 0) d += 1440;
-  return d;
-}
-function fmt(mins){
-  if(mins==null) return "—";
-  const h = Math.floor(mins/60), m = mins%60;
-  if(h===0) return m + "m";
-  if(m===0) return h + "h";
-  return h + "h " + m + "m";
-}
+function toMin(t){ if(!t) return null; const [h,m]=t.split(":").map(Number);
+  return (Number.isNaN(h)||Number.isNaN(m))?null:h*60+m; }
+function diff(a,b){ if(a==null||b==null) return null; let d=b-a; if(d<0)d+=1440; return d; }
+function fmt(mins){ if(mins==null) return "—"; const h=Math.floor(mins/60),m=mins%60;
+  if(h===0) return m+"m"; if(m===0) return h+"h"; return h+"h "+m+"m"; }
+
+/* ---------- date helpers ---------- */
+function isoToday(){ const d=new Date(); const off=d.getTimezoneOffset();
+  return new Date(d.getTime()-off*60000).toISOString().slice(0,10); }
+function prevIso(iso){ const d=new Date(iso+"T00:00:00"); d.setDate(d.getDate()-1);
+  return d.toISOString().slice(0,10); }
+function prettyDate(iso){ const d=new Date(iso+"T00:00:00");
+  return d.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); }
 
 /* ---------- compute one day's metrics ---------- */
-function computeDay(iso, all){
-  const rec = all[iso] || {};
-  const prev = all[prevIso(iso)] || {};
-
-  const wake = toMin(rec.morningWake);
-  const napS = toMin(rec.napStart);
-  const napE = toMin(rec.napEnd);
-  const bed  = toMin(rec.bedStart);
-  const sleep= toMin(rec.fallAsleep);
-  const prevSleep = toMin(prev.fallAsleep);
-
-  // night sleep = previous fall-asleep -> this morning wake (crosses midnight)
-  const night = (prevSleep!=null && wake!=null) ? diff(prevSleep, wake) : null;
-  const nap   = diff(napS, napE);
-  const total = (night!=null || nap!=null) ? ((night||0) + (nap||0)) : null;
-  const ww1   = diff(wake, napS);
-  const ww2   = diff(napE, sleep);
-  const settle= diff(bed, sleep);
-
-  return {night, nap, total, ww1, ww2, settle,
-          hasNight: night!=null, hasNap: nap!=null};
+function computeDay(iso, days){
+  const rec = days[iso] || {}, prev = days[prevIso(iso)] || {};
+  const wake=toMin(rec.morningWake), napS=toMin(rec.napStart), napE=toMin(rec.napEnd),
+        bed=toMin(rec.bedStart), sleep=toMin(rec.fallAsleep), prevSleep=toMin(prev.fallAsleep);
+  const night=(prevSleep!=null&&wake!=null)?diff(prevSleep,wake):null;
+  const nap=diff(napS,napE);
+  const total=(night!=null||nap!=null)?((night||0)+(nap||0)):null;
+  return { night, nap, total, ww1:diff(wake,napS), ww2:diff(napE,sleep), settle:diff(bed,sleep) };
 }
 
-/* ---------- UI state ---------- */
-let currentDate = isoToday();
+/* ---------- app state ---------- */
+const state = { days:{}, current:isoToday(), roomId:null, db:null, ready:false };
 
-function readForm(){
-  const rec = {};
-  FIELDS.forEach(f => { const v = $(f).value; if(v) rec[f] = v; });
-  return rec;
-}
-function fillForm(rec){
-  FIELDS.forEach(f => { $(f).value = (rec && rec[f]) ? rec[f] : ""; });
-}
+function readForm(){ const r={}; FIELDS.forEach(f=>{const v=$(f).value; if(v)r[f]=v;}); return r; }
+function fillForm(rec){ FIELDS.forEach(f=>{ $(f).value=(rec&&rec[f])?rec[f]:""; }); }
 
-function renderCalc(){
-  const all = loadAll();
-  const m = computeDay(currentDate, all);
-  $("calcDateLabel").textContent = prettyDate(currentDate);
-  const set = (id, val) => {
-    const el = $(id);
-    el.textContent = (val==null) ? "—" : fmt(val);
-    el.classList.toggle("warnmiss", val==null);
-  };
-  set("cNight", m.night);
-  set("cNap", m.nap);
-  set("cTotal", m.total);
-  set("cWW1", m.ww1);
-  set("cWW2", m.ww2);
-  set("cBed", m.settle);
+function renderCalc(daysOverride){
+  const days = daysOverride || state.days;
+  const m = computeDay(state.current, days);
+  $("calcDateLabel").textContent = prettyDate(state.current);
+  const set=(id,v)=>{const el=$(id);el.textContent=v==null?"—":fmt(v);el.classList.toggle("warnmiss",v==null);};
+  set("cNight",m.night);set("cNap",m.nap);set("cTotal",m.total);
+  set("cWW1",m.ww1);set("cWW2",m.ww2);set("cBed",m.settle);
 }
 
 function renderHistory(){
-  const all = loadAll();
-  const dates = Object.keys(all).sort().reverse();
-  const wrap = $("history");
-  const avgWrap = $("avgWrap");
-  wrap.innerHTML = "";
-
-  if(dates.length === 0){
-    wrap.innerHTML = '<div class="empty">No days logged yet. Enter today\'s times above.</div>';
-    avgWrap.innerHTML = "";
-    return;
+  const dates = Object.keys(state.days).sort().reverse();
+  const wrap=$("history"), avgWrap=$("avgWrap");
+  wrap.innerHTML="";
+  if(dates.length===0){
+    wrap.innerHTML='<div class="empty">No days logged yet. Enter today\'s times above.</div>';
+    avgWrap.innerHTML=""; return;
   }
-
-  // averages over last 7 logged days that have a value
-  const recent = dates.slice(0,7);
-  let tSum=0,tN=0, nSum=0,nN=0;
-  recent.forEach(iso => {
-    const m = computeDay(iso, all);
-    if(m.total!=null){ tSum+=m.total; tN++; }
-    if(m.nap!=null){ nSum+=m.nap; nN++; }
-  });
-  avgWrap.innerHTML =
+  const recent=dates.slice(0,7);
+  let tSum=0,tN=0,nSum=0,nN=0;
+  recent.forEach(iso=>{const m=computeDay(iso,state.days);
+    if(m.total!=null){tSum+=m.total;tN++;} if(m.nap!=null){nSum+=m.nap;nN++;}});
+  avgWrap.innerHTML=
     '<div class="row"><span class="muted">Avg total / day (last '+recent.length+')</span>'+
     '<span class="v" style="font-size:16px;color:var(--accent2)">'+(tN?fmt(Math.round(tSum/tN)):"—")+'</span></div>'+
     '<div class="row" style="margin-bottom:14px"><span class="muted">Avg nap (last '+recent.length+')</span>'+
     '<span class="v" style="font-size:16px">'+(nN?fmt(Math.round(nSum/nN)):"—")+'</span></div>';
-
-  dates.forEach(iso => {
-    const m = computeDay(iso, all);
-    const div = document.createElement("div");
-    div.className = "hrow";
-    div.innerHTML =
-      '<div class="hd"><span class="dt">'+prettyDate(iso)+'</span>'+
+  dates.forEach(iso=>{
+    const m=computeDay(iso,state.days);
+    const div=document.createElement("div"); div.className="hrow";
+    div.innerHTML='<div class="hd"><span class="dt">'+prettyDate(iso)+'</span>'+
       '<span class="tot">'+(m.total!=null?fmt(m.total):"—")+' total</span></div>'+
-      '<div class="sub">'+
-      'Night '+fmt(m.night)+' · Nap '+fmt(m.nap)+'<br>'+
-      'WW1 '+fmt(m.ww1)+' · WW2 '+fmt(m.ww2)+' · Settle '+fmt(m.settle)+
-      '</div>';
-    div.addEventListener("click", () => {
-      currentDate = iso;
-      $("datePicker").value = iso;
-      fillForm(loadAll()[iso] || {});
-      renderCalc();
-      window.scrollTo({top:0, behavior:"smooth"});
-    });
+      '<div class="sub">Night '+fmt(m.night)+' · Nap '+fmt(m.nap)+'<br>'+
+      'WW1 '+fmt(m.ww1)+' · WW2 '+fmt(m.ww2)+' · Settle '+fmt(m.settle)+'</div>';
+    div.addEventListener("click",()=>{ state.current=iso; $("datePicker").value=iso;
+      fillForm(state.days[iso]||{}); renderCalc(); window.scrollTo({top:0,behavior:"smooth"}); });
     wrap.appendChild(div);
   });
 }
 
-function flash(msg){
-  const f = $("flash");
-  f.textContent = msg || "Saved ✓";
-  f.classList.add("show");
-  setTimeout(() => f.classList.remove("show"), 1300);
+function flash(msg){ const f=$("flash"); f.textContent=msg||"Saved ✓";
+  f.classList.add("show"); setTimeout(()=>f.classList.remove("show"),1300); }
+
+function setSync(kind){ // 'ok' | 'saving' | 'offline'
+  const dot=$("syncDot"), txt=$("syncText");
+  dot.className="dot"+(kind==="saving"?" saving":kind==="offline"?" offline":"");
+  txt.textContent = kind==="saving"?"Saving…":kind==="offline"?"Offline":"Synced";
 }
 
-/* ---------- actions ---------- */
-function save(){
-  const all = loadAll();
-  const rec = readForm();
-  if(Object.keys(rec).length === 0){
-    delete all[currentDate];
-  } else {
-    all[currentDate] = rec;
-  }
-  saveAll(all);
-  renderCalc();
-  renderHistory();
-  flash("Saved ✓");
+/* ---------- firestore writes ---------- */
+let saveTimer=null;
+function scheduleSave(){
+  setSync("saving");
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(commitCurrent,600);
+}
+async function commitCurrent(){
+  if(!state.ready) return;
+  const rec=readForm();
+  const ref=doc(state.db,"rooms",state.roomId,"days",state.current);
+  try{
+    if(Object.keys(rec).length===0){ await deleteDoc(ref); }
+    else{ await setDoc(ref,rec); }
+    // optimistic local update so calc reflects instantly
+    if(Object.keys(rec).length===0) delete state.days[state.current];
+    else state.days[state.current]=rec;
+    renderCalc(); renderHistory();
+  }catch(e){ setSync("offline"); }
 }
 
-function loadDate(iso){
-  currentDate = iso;
-  fillForm(loadAll()[iso] || {});
-  renderCalc();
+/* ---------- export ---------- */
+function download(name,content,type){
+  const blob=new Blob([content],{type}); const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
-
 function exportCsv(){
-  const all = loadAll();
-  const dates = Object.keys(all).sort();
-  const head = ["date","morning_wake","nap_start","nap_end","bedtime_start","fell_asleep",
-    "night_sleep_min","nap_min","total_min","wake_window1_min","wake_window2_min","settle_min"];
-  const rows = [head.join(",")];
-  dates.forEach(iso => {
-    const r = all[iso], m = computeDay(iso, all);
-    rows.push([iso, r.morningWake||"", r.napStart||"", r.napEnd||"",
-      r.bedStart||"", r.fallAsleep||"",
-      m.night??"", m.nap??"", m.total??"", m.ww1??"", m.ww2??"", m.settle??""].join(","));
+  const dates=Object.keys(state.days).sort();
+  const head=["date","morning_wake","nap_start","nap_end","bedtime_start","fell_asleep",
+    "night_min","nap_min","total_min","ww1_min","ww2_min","settle_min"];
+  const rows=[head.join(",")];
+  dates.forEach(iso=>{const r=state.days[iso],m=computeDay(iso,state.days);
+    rows.push([iso,r.morningWake||"",r.napStart||"",r.napEnd||"",r.bedStart||"",r.fallAsleep||"",
+      m.night??"",m.nap??"",m.total??"",m.ww1??"",m.ww2??"",m.settle??""].join(","));});
+  download("toddler_sleep.csv",rows.join("\n"),"text/csv");
+}
+
+/* ---------- wire UI ---------- */
+$("datePicker").value=state.current;
+$("saveBtn").addEventListener("click",()=>{clearTimeout(saveTimer);commitCurrent().then(()=>flash("Saved ✓"));});
+$("todayBtn").addEventListener("click",()=>{state.current=isoToday();$("datePicker").value=state.current;
+  fillForm(state.days[state.current]||{});renderCalc();});
+$("datePicker").addEventListener("change",e=>{state.current=e.target.value||isoToday();
+  fillForm(state.days[state.current]||{});renderCalc();});
+$("exportCsv").addEventListener("click",exportCsv);
+$("exportJson").addEventListener("click",()=>download("toddler_sleep_backup.json",JSON.stringify(state.days,null,2),"application/json"));
+$("signOut").addEventListener("click",()=>{ localStorage.removeItem(PC_KEY); location.reload(); });
+FIELDS.forEach(f=>$(f).addEventListener("input",()=>{ renderCalc(previewDays()); scheduleSave(); }));
+function previewDays(){ const d=Object.assign({},state.days); const rec=readForm();
+  if(Object.keys(rec).length) d[state.current]=rec; else delete d[state.current]; return d; }
+
+window.addEventListener("online",()=>{ if(state.ready) setSync("ok"); });
+window.addEventListener("offline",()=>setSync("offline"));
+
+/* ---------- passcode -> room id ---------- */
+async function roomIdFromPasscode(pc){
+  const data=new TextEncoder().encode("toddlersleep:v1:"+pc.trim().toLowerCase());
+  const buf=await crypto.subtle.digest("SHA-256",data);
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("").slice(0,32);
+}
+
+/* ---------- boot ---------- */
+function configReady(){
+  const c=window.FIREBASE_CONFIG||{};
+  return c.apiKey && !String(c.apiKey).startsWith("PASTE") && c.projectId && !String(c.projectId).startsWith("PASTE");
+}
+function show(screen){ ["gateScreen","loadScreen","setupScreen"].forEach(s=>$(s).classList.add("hidden"));
+  $("app").classList.add("hidden"); if(screen==="app")$("app").classList.remove("hidden"); else $(screen).classList.remove("hidden"); }
+
+let fbApp=null, fbAuth=null, unsub=null;
+function initFirebase(){
+  if(fbApp) return;
+  fbApp=initializeApp(window.FIREBASE_CONFIG);
+  fbAuth=getAuth(fbApp);
+  state.db=initializeFirestore(fbApp,{
+    localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})
   });
-  download("toddler_sleep.csv", rows.join("\n"), "text/csv");
-}
-function exportJson(){
-  download("toddler_sleep_backup.json", JSON.stringify(loadAll(),null,2), "application/json");
-}
-function download(name, content, type){
-  const blob = new Blob([content], {type});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = name; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
-}
-function importJson(file){
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const incoming = JSON.parse(reader.result);
-      if(typeof incoming !== "object" || incoming===null) throw new Error("bad");
-      const all = loadAll();
-      Object.assign(all, incoming);
-      saveAll(all);
-      loadDate(currentDate);
-      renderHistory();
-      flash("Restored ✓");
-    } catch(e){ flash("Invalid file ✕"); }
-  };
-  reader.readAsText(file);
 }
 
-/* ---------- wire up ---------- */
-$("datePicker").value = currentDate;
-$("saveBtn").addEventListener("click", save);
-$("todayBtn").addEventListener("click", () => {
-  $("datePicker").value = isoToday();
-  loadDate(isoToday());
+async function startSession(passcode){
+  show("loadScreen"); $("loadMsg").textContent="Connecting…";
+  try{
+    initFirebase();
+    await signInAnonymously(fbAuth);
+    state.roomId=await roomIdFromPasscode(passcode);
+    if(unsub) unsub();
+    // live listener — pushes remote changes in real time, never stale
+    const col=collection(state.db,"rooms",state.roomId,"days");
+    unsub=onSnapshot(col,{includeMetadataChanges:true},(snap)=>{
+      const days={}; snap.forEach(d=>{days[d.id]=d.data();});
+      state.days=days;
+      // refresh form only if not actively editing that field set
+      if(document.activeElement && FIELDS.includes(document.activeElement.id)){
+        // user is typing — don't clobber their input, just recalc others
+      } else {
+        fillForm(state.days[state.current]||{});
+      }
+      renderCalc(); renderHistory();
+      if(snap.metadata.hasPendingWrites) setSync("saving");
+      else if(snap.metadata.fromCache && !navigator.onLine) setSync("offline");
+      else setSync("ok");
+      if(!state.ready){ state.ready=true; show("app"); fillForm(state.days[state.current]||{}); }
+    },(err)=>{ $("loadMsg").textContent="Connection error: "+err.code+". Check your passcode/rules and reload."; });
+  }catch(e){
+    show("gateScreen");
+    $("gateErr").textContent="Could not connect ("+(e.code||e.message)+"). Try again.";
+  }
+}
+
+$("enterBtn").addEventListener("click",async ()=>{
+  const pc=$("pc").value.trim();
+  if(pc.length<4){ $("gateErr").textContent="Passcode must be at least 4 characters."; return; }
+  $("gateErr").textContent="";
+  localStorage.setItem(PC_KEY,pc);
+  startSession(pc);
 });
-$("datePicker").addEventListener("change", e => loadDate(e.target.value || isoToday()));
-$("exportCsv").addEventListener("click", exportCsv);
-$("exportJson").addEventListener("click", exportJson);
-$("importJson").addEventListener("click", () => $("importFile").click());
-$("importFile").addEventListener("change", e => { if(e.target.files[0]) importJson(e.target.files[0]); e.target.value=""; });
+$("pc").addEventListener("keydown",e=>{ if(e.key==="Enter") $("enterBtn").click(); });
 
-// live recalc as you type, without needing to save
-FIELDS.forEach(f => $(f).addEventListener("input", () => {
-  const all = loadAll();
-  const rec = readForm();
-  if(Object.keys(rec).length) all[currentDate] = rec; else delete all[currentDate];
-  // temp compute on in-memory copy
-  const m = computeDay(currentDate, Object.assign({}, all));
-  const set = (id,val)=>{const el=$(id);el.textContent=val==null?"—":fmt(val);el.classList.toggle("warnmiss",val==null);};
-  set("cNight",m.night);set("cNap",m.nap);set("cTotal",m.total);
-  set("cWW1",m.ww1);set("cWW2",m.ww2);set("cBed",m.settle);
-}));
-
-loadDate(currentDate);
-renderHistory();
-
-if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("sw.js").catch(()=>{});
+// initial route
+if(!configReady()){
+  show("setupScreen");
+} else {
+  const saved=localStorage.getItem(PC_KEY);
+  if(saved){ startSession(saved); }
+  else { show("gateScreen"); }
 }
+
+if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
 </script>
 </body>
 </html>
