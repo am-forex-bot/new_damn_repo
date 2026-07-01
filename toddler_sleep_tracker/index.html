@@ -180,7 +180,7 @@
       <span class="v" id="cNap">—</span>
     </div>
     <div class="stat total">
-      <span class="k">Total sleep this day</span>
+      <span class="k">Total sleep this day <span class="pill" id="cTotalNote" style="display:none"></span></span>
       <span class="v" id="cTotal">—</span>
     </div>
     <div class="stat">
@@ -229,25 +229,35 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getAuth, signInAnonymously, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-         collection, doc, setDoc, deleteDoc, onSnapshot }
+         collection, doc, setDoc, deleteDoc, deleteField, onSnapshot }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 "use strict";
 const $ = (id) => document.getElementById(id);
 const FIELDS = ["morningWake","napStart","napEnd","bedStart","fallAsleep"];
 const PC_KEY = "toddlerSleep.passcode";
+// fields the user has changed locally but not yet committed — protected from being
+// overwritten by an incoming sync, and the only fields a save writes (merge, per-field).
+const dirtyFields = new Set();
 
 /* ---------- time math (minutes since midnight) ---------- */
 function toMin(t){ if(!t) return null; const [h,m]=t.split(":").map(Number);
   return (Number.isNaN(h)||Number.isNaN(m))?null:h*60+m; }
-function diff(a,b){ if(a==null||b==null) return null; let d=b-a; if(d<0)d+=1440; return d; }
+// intra-day gap (wake→nap, nap length, bedtime settling…): never crosses midnight,
+// so if the end is before the start it's incomplete/mistyped → null, NOT a ~24h wrap.
+function dur(a,b){ if(a==null||b==null) return null; const d=b-a; return d<0?null:d; }
+// overnight sleep: evening fall-asleep → next morning wake, so it legitimately wraps midnight.
+function nightDur(asleep,wake){ if(asleep==null||wake==null) return null; let d=wake-asleep; if(d<0)d+=1440; return d; }
 function fmt(mins){ if(mins==null) return "—"; const h=Math.floor(mins/60),m=mins%60;
   if(h===0) return m+"m"; if(m===0) return h+"h"; return h+"h "+m+"m"; }
 
 /* ---------- date helpers ---------- */
 function isoToday(){ const d=new Date(); const off=d.getTimezoneOffset();
   return new Date(d.getTime()-off*60000).toISOString().slice(0,10); }
-function prevIso(iso){ const d=new Date(iso+"T00:00:00"); d.setDate(d.getDate()-1);
+// date arithmetic done entirely in UTC so it can't drift a day in +UTC timezones.
+function prevIso(iso){ const d=new Date(iso+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()-1);
+  return d.toISOString().slice(0,10); }
+function daysAgoIso(n){ const d=new Date(isoToday()+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()-n);
   return d.toISOString().slice(0,10); }
 function prettyDate(iso){ const d=new Date(iso+"T00:00:00");
   return d.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); }
@@ -257,14 +267,18 @@ function computeDay(iso, days){
   const rec = days[iso] || {}, prev = days[prevIso(iso)] || {};
   const wake=toMin(rec.morningWake), napS=toMin(rec.napStart), napE=toMin(rec.napEnd),
         bed=toMin(rec.bedStart), sleep=toMin(rec.fallAsleep), prevSleep=toMin(prev.fallAsleep);
-  const night=(prevSleep!=null&&wake!=null)?diff(prevSleep,wake):null;
-  const nap=diff(napS,napE);
+  const night=nightDur(prevSleep,wake);
+  const nap=dur(napS,napE);
+  // partial-friendly: a missing component counts as 0 so a total still shows,
+  // but `complete` marks whether BOTH night and nap are known (used for averages).
   const total=(night!=null||nap!=null)?((night||0)+(nap||0)):null;
-  return { night, nap, total, ww1:diff(wake,napS), ww2:diff(napE,sleep), settle:diff(bed,sleep) };
+  return { night, nap, total, complete:(night!=null&&nap!=null),
+           ww1:dur(wake,napS), ww2:dur(napE,sleep), settle:dur(bed,sleep) };
 }
 
 /* ---------- app state ---------- */
 const state = { days:{}, current:isoToday(), roomId:null, db:null, ready:false };
+let todayIso = isoToday();  // tracks the real calendar day so a long-open session can roll over
 
 function readForm(){ const r={}; FIELDS.forEach(f=>{const v=$(f).value; if(v)r[f]=v;}); return r; }
 function fillForm(rec){ FIELDS.forEach(f=>{ $(f).value=(rec&&rec[f])?rec[f]:""; }); }
@@ -276,6 +290,10 @@ function renderCalc(daysOverride){
   const set=(id,v)=>{const el=$(id);el.textContent=v==null?"—":fmt(v);el.classList.toggle("warnmiss",v==null);};
   set("cNight",m.night);set("cNap",m.nap);set("cTotal",m.total);
   set("cWW1",m.ww1);set("cWW2",m.ww2);set("cBed",m.settle);
+  // be honest when the total is only part of the 24h (so it's not mistaken for the full day)
+  const note=$("cTotalNote");
+  if(m.total!=null && !m.complete){ note.textContent = m.night==null ? "last night not logged" : "nap not logged"; note.style.display=""; }
+  else { note.textContent=""; note.style.display="none"; }
 }
 
 function renderHistory(){
@@ -286,14 +304,17 @@ function renderHistory(){
     wrap.innerHTML='<div class="empty">No days logged yet. Enter today\'s times above.</div>';
     avgWrap.innerHTML=""; return;
   }
-  const recent=dates.slice(0,7);
+  // average over the last 7 CALENDAR days, and only over fully-logged days so a
+  // half-entered day (e.g. today before the nap) can't drag the average down.
+  const cutoff=daysAgoIso(6);
+  const windowDates=dates.filter(iso=>iso>=cutoff);
   let tSum=0,tN=0,nSum=0,nN=0;
-  recent.forEach(iso=>{const m=computeDay(iso,state.days);
-    if(m.total!=null){tSum+=m.total;tN++;} if(m.nap!=null){nSum+=m.nap;nN++;}});
+  windowDates.forEach(iso=>{const m=computeDay(iso,state.days);
+    if(m.complete){tSum+=m.total;tN++;} if(m.nap!=null){nSum+=m.nap;nN++;}});
   avgWrap.innerHTML=
-    '<div class="row"><span class="muted">Avg total / day (last '+recent.length+')</span>'+
+    '<div class="row"><span class="muted">Avg total / day <span style="opacity:.7">(last 7d · '+tN+' full)</span></span>'+
     '<span class="v" style="font-size:16px;color:var(--accent2)">'+(tN?fmt(Math.round(tSum/tN)):"—")+'</span></div>'+
-    '<div class="row" style="margin-bottom:14px"><span class="muted">Avg nap (last '+recent.length+')</span>'+
+    '<div class="row" style="margin-bottom:14px"><span class="muted">Avg nap <span style="opacity:.7">('+nN+' day'+(nN===1?'':'s')+')</span></span>'+
     '<span class="v" style="font-size:16px">'+(nN?fmt(Math.round(nSum/nN)):"—")+'</span></div>';
   dates.forEach(iso=>{
     const m=computeDay(iso,state.days);
@@ -302,8 +323,7 @@ function renderHistory(){
       '<span class="tot">'+(m.total!=null?fmt(m.total):"—")+' total</span></div>'+
       '<div class="sub">Night '+fmt(m.night)+' · Nap '+fmt(m.nap)+'<br>'+
       'WW1 '+fmt(m.ww1)+' · WW2 '+fmt(m.ww2)+' · Settle '+fmt(m.settle)+'</div>';
-    div.addEventListener("click",()=>{ state.current=iso; $("datePicker").value=iso;
-      fillForm(state.days[iso]||{}); renderCalc(); window.scrollTo({top:0,behavior:"smooth"}); });
+    div.addEventListener("click",()=>{ switchDay(iso); window.scrollTo({top:0,behavior:"smooth"}); });
     wrap.appendChild(div);
   });
 }
@@ -326,16 +346,39 @@ function scheduleSave(){
 }
 async function commitCurrent(){
   if(!state.ready) return;
-  const rec=readForm();
-  const ref=doc(state.db,"rooms",state.roomId,"days",state.current);
+  const day=state.current;
+  const changed=[...dirtyFields];        // snapshot the fields to write right now
+  if(changed.length===0){ setSync("ok"); return; }
+  const ref=doc(state.db,"rooms",state.roomId,"days",day);
+  const rec=Object.assign({},state.days[day]||{});
+  const update={};                        // write ONLY changed fields (merge) so we never
+  changed.forEach(f=>{                     // clobber a field the partner just edited
+    const v=$(f).value;
+    if(v){ update[f]=v; rec[f]=v; } else { update[f]=deleteField(); delete rec[f]; }
+  });
   try{
-    if(Object.keys(rec).length===0){ await deleteDoc(ref); }
-    else{ await setDoc(ref,rec); }
-    // optimistic local update so calc reflects instantly
-    if(Object.keys(rec).length===0) delete state.days[state.current];
-    else state.days[state.current]=rec;
-    renderCalc(); renderHistory();
+    if(Object.keys(rec).length===0){ await deleteDoc(ref); delete state.days[day]; }
+    else{ await setDoc(ref,update,{merge:true}); state.days[day]=rec; }
+    changed.forEach(f=>dirtyFields.delete(f));   // only clear what we actually committed
+    renderCalc(previewDays()); renderHistory(); setSync("ok");
   }catch(e){ setSync("offline"); }
+}
+// move to a different day: flush any pending edits to the day we're leaving, then load the new one.
+function switchDay(iso){
+  if(dirtyFields.size){ clearTimeout(saveTimer); commitCurrent(); }
+  dirtyFields.clear();
+  todayIso=isoToday();
+  state.current=iso; $("datePicker").value=iso;   // keep the picker in sync with the save target
+  fillForm(state.days[iso]||{}); renderCalc();
+}
+// advance to a new calendar day if the session was left open past midnight (and we're not mid-edit).
+function refreshToday(){
+  const t=isoToday();
+  if(t===todayIso) return;
+  const editing=(document.activeElement&&FIELDS.includes(document.activeElement.id))||dirtyFields.size>0;
+  const wasToday=state.current===todayIso;
+  todayIso=t;
+  if(wasToday && !editing) switchDay(t);
 }
 
 /* ---------- export ---------- */
@@ -357,15 +400,24 @@ function exportCsv(){
 
 /* ---------- wire UI ---------- */
 $("datePicker").value=state.current;
-$("saveBtn").addEventListener("click",()=>{clearTimeout(saveTimer);commitCurrent().then(()=>flash("Saved ✓"));});
-$("todayBtn").addEventListener("click",()=>{state.current=isoToday();$("datePicker").value=state.current;
-  fillForm(state.days[state.current]||{});renderCalc();});
-$("datePicker").addEventListener("change",e=>{state.current=e.target.value||isoToday();
-  fillForm(state.days[state.current]||{});renderCalc();});
+$("saveBtn").addEventListener("click",()=>{
+  clearTimeout(saveTimer);
+  // capture anything on screen that differs from what's saved, then write it
+  const rec=state.days[state.current]||{};
+  FIELDS.forEach(f=>{ if(($(f).value||"")!==(rec[f]||"")) dirtyFields.add(f); });
+  commitCurrent().then(()=>flash("Saved ✓"));
+});
+$("todayBtn").addEventListener("click",()=>switchDay(isoToday()));
+$("datePicker").addEventListener("change",e=>switchDay(e.target.value||isoToday()));
 $("exportCsv").addEventListener("click",exportCsv);
 $("exportJson").addEventListener("click",()=>download("toddler_sleep_backup.json",JSON.stringify(state.days,null,2),"application/json"));
 $("signOut").addEventListener("click",()=>{ localStorage.removeItem(PC_KEY); location.reload(); });
-FIELDS.forEach(f=>$(f).addEventListener("input",()=>{ renderCalc(previewDays()); scheduleSave(); }));
+FIELDS.forEach(f=>$(f).addEventListener("input",()=>{ dirtyFields.add(f); renderCalc(previewDays()); scheduleSave(); }));
+// commit promptly when a field is committed (blur / picker set) to shrink the debounce race window
+FIELDS.forEach(f=>$(f).addEventListener("change",()=>{ if(dirtyFields.has(f)){ clearTimeout(saveTimer); commitCurrent(); } }));
+// roll over to the new day if the app was left open across midnight
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden) refreshToday(); });
+window.addEventListener("focus",refreshToday);
 function previewDays(){ const d=Object.assign({},state.days); const rec=readForm();
   if(Object.keys(rec).length) d[state.current]=rec; else delete d[state.current]; return d; }
 
@@ -409,17 +461,18 @@ async function startSession(passcode){
     unsub=onSnapshot(col,{includeMetadataChanges:true},(snap)=>{
       const days={}; snap.forEach(d=>{days[d.id]=d.data();});
       state.days=days;
-      // refresh form only if not actively editing that field set
-      if(document.activeElement && FIELDS.includes(document.activeElement.id)){
-        // user is typing — don't clobber their input, just recalc others
-      } else {
-        fillForm(state.days[state.current]||{});
-      }
-      renderCalc(); renderHistory();
+      const rec=state.days[state.current]||{};
+      const active=document.activeElement && document.activeElement.id;
+      // refresh each field from the synced data EXCEPT the one being edited or holding an
+      // uncommitted local change — so a partner's edits to other fields show up live, while
+      // your in-progress typing is never wiped.
+      FIELDS.forEach(f=>{ if(f===active || dirtyFields.has(f)) return; $(f).value=rec[f]||""; });
+      const editing=(active && FIELDS.includes(active)) || dirtyFields.size>0;
+      renderCalc(editing ? previewDays() : undefined); renderHistory();
       if(snap.metadata.hasPendingWrites) setSync("saving");
       else if(snap.metadata.fromCache && !navigator.onLine) setSync("offline");
       else setSync("ok");
-      if(!state.ready){ state.ready=true; show("app"); fillForm(state.days[state.current]||{}); }
+      if(!state.ready){ state.ready=true; show("app"); }
     },(err)=>{ $("loadMsg").textContent="Connection error: "+err.code+". Check your passcode/rules and reload."; });
   }catch(e){
     show("gateScreen");
